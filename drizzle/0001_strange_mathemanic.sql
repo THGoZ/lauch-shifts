@@ -1,0 +1,1 @@
+ALTER TABLE `shift` ADD `details` text;

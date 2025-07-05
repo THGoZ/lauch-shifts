@@ -1,0 +1,22 @@
+import joi from 'joi';
+
+const patientSchema = joi.object({
+  name: joi.string().required(),
+  lastname: joi.string().required(),
+  dni: joi.string().required().regex(/^[0-9]{8}$/),
+});
+
+const shiftSchema = joi.object({
+  patient_id: joi.number().required().integer().positive(),
+  date: joi.string().required(),
+  start_time: joi.string().required(),
+  duration: joi.number().required().integer().positive(),
+  status: joi.string().optional().valid('pending', 'confirmed', 'canceled'),
+  reason_incomplete: joi.string().optional(),
+  details: joi.string().optional().min(10).max(500),
+});
+
+export default {
+    patientSchema,
+    shiftSchema,
+}

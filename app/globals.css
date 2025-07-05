@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f8fdfd;
+  --foreground: #0a2e2e;
+  --primary: #4fd1c7;
+  --primary-foreground: #ffffff;
+  --secondary: #7dd3d8;
+  --secondary-foreground: #1a4b4b;
+  --accent: #40e0d0;
+  --accent-foreground: #0f3333;
+  --muted: #e6f7f7;
+  --muted-foreground: #5a7a7a;
+  --border: #b8e6e6;
+  --input: #d4f1f1;
+  --ring: #4fd1c7;
+  --destructive: #ef4444;
+  --destructive-foreground: #ed8e8e;
+  --destructive-muted: #f8d7da;
+  --destructive-muted-foreground: #a82a2a;
+  --warning: #f59e0b;
+  --success: #10b981;
+  --success-foreground: #ffffff;
+}
+
+.dark {
+  --background: #0a1a1a;
+  --foreground: #e6f7f7;
+  --primary: #4fd1c7;
+  --primary-foreground: #0a2e2e;
+  --secondary: #2a5a5a;
+  --secondary-foreground: #b8e6e6;
+  --accent: #40e0d0;
+  --accent-foreground: #0a1a1a;
+  --muted: #1a3333;
+  --muted-foreground: #7dd3d8;
+  --border: #2a4a4a;
+  --input: #1a3333;
+  --ring: #4fd1c7;
+  --destructive: #ef4444;
+  --destructive-foreground: #edb2b2;
+  --destructive-muted: #470f14;
+  --destructive-muted-foreground: #a82a2a;
+  --warning: #f59e0b;
+  --success: #10b981;
+  --success-foreground: #ffffff;
+}
