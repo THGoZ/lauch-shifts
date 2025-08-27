@@ -4,9 +4,9 @@ import { CustomError } from "@/domain/entities/error-entity";
 
 import { PagedResult } from "@/interfaces/interface";
 import { parseSQLiteErrorFields } from "@/utils/db-error-handlers";
-import { and, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { countDbQuery } from "../shared/common";
-import { buildFilterConditions, buildSearchConditions, Filter, paginationValues } from "../utils/queryHandle";
+import { buildFilterConditions, buildSearchConditions, Filter, paginationValues, SortValue } from "../utils/queryHandle";
 
 export class Patient {
 
@@ -14,14 +14,23 @@ export class Patient {
         search = "",
         page = 1,
         limit = 10,
-        filters: Filter<typeof patient>[] = []
+        filters: Filter<typeof patient>[] = [],
+        sort: SortValue<typeof patient> = { field: "name", order: "desc" }
     ): Promise<PagedResult<PatientType>> {
-        const searchClause = buildSearchConditions(patient, search, ["name", "lastname"]);
-        const filterClause = buildFilterConditions(patient, filters);
 
+        const normalizedFilters = filters.map(f => {
+            if (f.field === "created_at" && typeof f.value === "string") {
+                return { ...f, value: new Date(f.value) };
+            }
+            return f;
+        });
+
+        const searchClause = buildSearchConditions(patient, search, ["name", "lastname"]);
+        const filterClause = buildFilterConditions(patient, normalizedFilters);
+        console.log(filters);
         const whereClause = and(
             ...(searchClause ? [searchClause] : []),
-            ...(filterClause ? [filterClause] : [])
+            ...(filterClause ? [filterClause] : []),
         );
 
         const count = await countDbQuery(patient, whereClause);
@@ -32,13 +41,13 @@ export class Patient {
             throw new Error("Page not found");
         }
 
-
         const response = await db
             .select()
             .from(patient)
             .where(whereClause)
             .limit(limit)
-            .offset((page - 1) * limit);
+            .offset((page - 1) * limit)
+            .orderBy(sort.order === "asc" ? asc(patient[sort.field] as any) : desc(patient[sort.field] as any));
 
         return {
             data: response,

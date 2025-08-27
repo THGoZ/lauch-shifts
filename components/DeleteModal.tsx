@@ -44,7 +44,7 @@ const DeleteModal = ({
       gap: 10,
     },
     title: {
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: "bold",
       color: colors.foreground,
     },
@@ -70,42 +70,40 @@ const DeleteModal = ({
   });
 
   return (
-    <Modal
-      visible={isVisible}
-      animationType="fade"
-      transparent={true}
-      onRequestClose={onCancel}
-    >
-      <View style={styles.centeredView}>
-        <View style={styles.modalView}>
-          <Text style={styles.title}>{title}</Text>
-          <View style={styles.subtitleContainer}>
-            <Text style={styles.subtitle}>
-              {description}{" "}
-            </Text>
-            <Text style={styles.itemName}>{itemName}</Text>
-            <Text style={styles.subtitle}>{" "}?</Text>
-          </View>
-          <View style={styles.buttonRow}>
-            <ThemedButton
-              onPress={onCancel}
-              variant="outline"
-              title="Cancel"
-              leftIcon="close-sharp"
-              loading={isLoading}
-              disabled={isLoading}
-            />
-            <ThemedButton
-              onPress={() => onDelete(item)}
-              variant="destructive"
-              leftIcon="trash-outline"
-              title="Delete"
-              disabled={isLoading}
-            />
+      <Modal
+        visible={isVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={onCancel}
+      >
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            <Text style={styles.title}>{title}</Text>
+            <View style={styles.subtitleContainer}>
+              <Text style={styles.subtitle}>{description} </Text>
+              <Text style={styles.itemName}>{itemName}</Text>
+              <Text style={styles.subtitle}> ?</Text>
+            </View>
+            <View style={styles.buttonRow}>
+              <ThemedButton
+                onPress={onCancel}
+                variant="outline"
+                title="Cancel"
+                leftIcon="close-sharp"
+                loading={isLoading}
+                disabled={isLoading}
+              />
+              <ThemedButton
+                onPress={() => onDelete(item)}
+                variant="destructive"
+                leftIcon="trash-outline"
+                title="Delete"
+                disabled={isLoading}
+              />
+            </View>
           </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
   );
 };
 

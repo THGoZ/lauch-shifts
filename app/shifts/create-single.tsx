@@ -9,15 +9,20 @@ import ThemedTextArea from "@/components/ThemedTextArea";
 import { usePatients } from "@/context/PatientsContext";
 import { useShifts } from "@/context/ShiftsContext";
 import { useToast } from "@/context/ToastContext";
+import { Shift } from "@/db/schema";
 import { CustomError } from "@/domain/entities/error-entity";
 import schema from "@/domain/validators/schema";
 import { useThemeColors } from "@/hooks/useThemeColors";
-import { FieldError, ShiftWithPatient } from "@/interfaces/interface";
+import {
+  FieldError,
+  ResultItem,
+  ShiftWithPatient,
+} from "@/interfaces/interface";
 import { availableSlots } from "@/services/shifts/shift.helpers";
 import { Ionicons } from "@expo/vector-icons";
 import { joiResolver } from "@hookform/resolvers/joi";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
@@ -39,6 +44,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 const durationOptions = [
+  //TODO: Implement this into the global settings
   { value: 30, label: "30 minutes" },
   { value: 45, label: "45 minutes" },
   { value: 60, label: "1 hour" },
@@ -305,18 +311,29 @@ export default function CreateSingleShift() {
     },
   });
 
+  const params = useLocalSearchParams();
+  const shiftId = params.id ? parseInt(params.id as string) : undefined;
+  const isReprogramming : boolean = params.isReprogramming ? true : false;
+
+  useEffect(() => {
+    console.log(params)
+  }, [params]);
+
   const {
     control,
     handleSubmit,
     watch,
-    formState: { errors },
+    formState: { errors, isDirty },
     setError,
+    reset,
   } = useForm({
     resolver: joiResolver(schema.shiftSchema),
   });
 
   const watchedFields = watch();
   const [filledFields, setFilledFields] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
+  const [originalData, setOriginalData] = useState<any>(null);
 
   useEffect(() => {
     const filled = fields.filter((field) => {
@@ -334,6 +351,8 @@ export default function CreateSingleShift() {
   const { patients, getPatients, isLoading } = usePatients();
   const {
     addShift,
+    getShiftById,
+    updateShift,
     isLoading: shifLoading,
     error: shiftError,
     getShiftByDate,
@@ -364,6 +383,44 @@ export default function CreateSingleShift() {
   const [selectedDate, setSelectedDate] = useState<string>("");
 
   useEffect(() => {
+    if (shiftId) {
+      setIsEditing(true);
+      const fetchShiftData = async () => {
+        const response = await getShiftById(shiftId);
+        if (!response.success) {
+          showToast(
+            "error",
+            "Error al obtener el turno",
+            response.error.message
+          );
+          return;
+        }
+        const shift = response.result;
+        setOriginalData({
+          date: shift.date,
+          details: shift.details || "",
+        });
+
+        /*         setValue("patient_id", shift.patient?.id);
+        setValue("date", shift.date);
+        setValue("start_time", shift.start_time);
+        setValue("duration", shift.duration);
+        setValue("details", shift.details || ""); */
+        reset({
+          patient_id: shift.patient?.id,
+          date: shift.date,
+          start_time: shift.start_time,
+          duration: shift.duration,
+          details: shift.details || "",
+        });
+
+        setSelectedDate(shift.date);
+      };
+      fetchShiftData();
+    }
+  }, [shiftId]);
+
+  useEffect(() => {
     const fetchPatients = async () => {
       await getPatients();
     };
@@ -378,9 +435,24 @@ export default function CreateSingleShift() {
   useEffect(() => {
     const fetchAndGenerateSlots = async () => {
       if (selectedDate.trim() !== "") {
-        const shifts = await getShiftByDate(selectedDate);
-        setShiftsOfDate(shifts);
-        const availableSlot = availableSlots(shifts);
+        const response = await getShiftByDate(selectedDate);
+        if (!response.success) {
+          showToast(
+            "error",
+            "Error al obtener los turnos",
+            response.error.message
+          );
+          return;
+        }
+        const shifts = response.result;
+
+        const filteredShifts =
+          isEditing && shiftId
+            ? shifts.filter((shift) => shift.id !== shiftId)
+            : shifts;
+
+        setShiftsOfDate(filteredShifts);
+        const availableSlot = availableSlots(filteredShifts);
         setTimeslots(availableSlot);
       }
     };
@@ -391,6 +463,26 @@ export default function CreateSingleShift() {
     return patients.data.find((p) => p.id === watch("patient_id"));
   };
 
+  // const hasChanges = () => {
+  //   if (!originalData) return true;
+
+  //   const currentData = {
+  //     patient_id: watch("patient_id"),
+  //     date: watch("date"),
+  //     start_time: watch("start_time"),
+  //     duration: watch("duration"),
+  //     details: watch("details") || "",
+  //   };
+
+  //   return JSON.stringify(currentData) !== JSON.stringify(originalData);
+  // };
+
+  const dateChanged = () => {
+    if(!originalData) return false;
+    if(!isReprogramming) return false;
+    return watch("date") === originalData.date;
+  }
+
   const onSubmit = async (data: {
     patient_id: number;
     date: string;
@@ -398,19 +490,40 @@ export default function CreateSingleShift() {
     duration: number;
     details: string;
   }) => {
-    const success = await addShift({
-      patient_id: data.patient_id,
-      date: data.date,
-      start_time: data.start_time,
-      duration: data.duration,
-      status: "pending",
-      details: data.details,
-    });
+    let success: ResultItem<Shift>;
+
+
+    if(isReprogramming){
+      data.details = data.details + `\n\nReprogramed from:\n${originalData.date} to ${data.date}`;
+    }
+
+    if (isEditing && shiftId) {
+      success = await updateShift(shiftId, {
+        //TODO: Add reprogramed status
+        patient_id: data.patient_id,
+        date: data.date,
+        start_time: data.start_time,
+        duration: data.duration,
+        status: "pending",
+        details: data.details,
+      });
+    } else {
+      success = await addShift({
+        patient_id: data.patient_id,
+        date: data.date,
+        start_time: data.start_time,
+        duration: data.duration,
+        status: "pending",
+        details: data.details,
+      });
+    }
+
     if (success.success) {
+      const action = isEditing ? "updated" : "created";
       showToast(
         "success",
-        "Shift created successfully",
-        `Shift created with id ${success.result.id}`
+        `Shift ${action} successfully`,
+        `Shift ${action} with id ${success.result.id}`
       );
       router.back();
     } else {
@@ -422,7 +535,11 @@ export default function CreateSingleShift() {
           });
         });
       }
-      showToast("error", "Error al crear turno", success.error.message);
+      showToast(
+        "error",
+        `Error ${isEditing ? "updating" : "creating"} shift`,
+        success.error.message
+      );
       return;
     }
   };
@@ -438,6 +555,14 @@ export default function CreateSingleShift() {
       });
     });
   }, [shiftError]);
+
+  const renderLoading = () => {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -456,7 +581,9 @@ export default function CreateSingleShift() {
             <Ionicons name="arrow-back" size={24} color={colors.foreground} />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Create Shift</Text>
+          <Text style={styles.headerTitle}>
+            {isEditing ? "Edit Shift" : "Create Shift"}
+          </Text>
 
           <View style={styles.placeholder} />
         </View>
@@ -481,9 +608,13 @@ export default function CreateSingleShift() {
                   />
                 </LinearGradient>
               </View>
-              <Text style={styles.formTitle}>Schedule New Shift</Text>
+              <Text style={styles.formTitle}>
+                {isEditing ? "Edit Shift" : "Schedule New Shift"}
+              </Text>
               <Text style={styles.formSubtitle}>
-                Select patient, date, and time for the appointment
+                {isEditing
+                  ? "Update patient, date, and time for the appointment"
+                  : "Select patient, date, and time for the appointment"}
               </Text>
             </View>
           </View>
@@ -494,254 +625,277 @@ export default function CreateSingleShift() {
             />
           </View>
           <View style={styles.content}>
-            {/* Patient Selection */}
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Patient *</Text>
+            {isLoading ? (
+              renderLoading()
+            ) : (
+              <>
+                {/* Patient Selection */}
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Patient *</Text>
 
-              <Controller
-                control={control}
-                name="patient_id"
-                render={({ field: { onChange, value } }) => (
-                  <ThemedSelect
-                    placeholder="Select a patient..."
-                    value={value}
-                    icon="person-outline"
-                    onValueChange={onChange}
-                    hasError={!!errors.patient_id} // Add this line!
-                    options={patients.data.map((patient) => ({
-                      label: `${patient.name} ${patient.lastname} (${patient.dni})`,
-                      value: patient.id,
-                    }))}
+                  <Controller
+                    control={control}
+                    name="patient_id"
+                    render={({ field: { onChange, value } }) => (
+                      <ThemedSelect
+                        placeholder="Select a patient..."
+                        value={value}
+                        icon="person-outline"
+                        onValueChange={onChange}
+                        hasError={!!errors.patient_id}
+                        disabled={isReprogramming}
+                        options={patients.data.map((patient) => ({
+                          label: `${patient.name} ${patient.lastname} (${patient.dni})`,
+                          value: patient.id,
+                        }))}
+                      />
+                    )}
                   />
-                )}
-              />
 
-              {errors.patient_id && (
-                <ErrorDisplay message={errors.patient_id.message as string} />
-              )}
+                  {errors.patient_id && (
+                    <ErrorDisplay
+                      message={errors.patient_id.message as string}
+                    />
+                  )}
 
-              {getSelectedPatient() && (
-                <View style={styles.selectedPatientCard}>
-                  <View style={styles.patientAvatar}>
-                    <Text style={styles.patientAvatarText}>
-                      {getSelectedPatient()!.name.charAt(0)}
-                      {getSelectedPatient()!.lastname.charAt(0)}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text style={styles.selectedPatientName}>
-                      {getSelectedPatient()!.name}{" "}
-                      {getSelectedPatient()!.lastname}
-                    </Text>
-                    <Text style={styles.selectedPatientDni}>
-                      DNI: {getSelectedPatient()!.dni}
-                    </Text>
+                  {getSelectedPatient() && (
+                    <View style={styles.selectedPatientCard}>
+                      <View style={styles.patientAvatar}>
+                        <Text style={styles.patientAvatarText}>
+                          {getSelectedPatient()!.name.charAt(0)}
+                          {getSelectedPatient()!.lastname.charAt(0)}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={styles.selectedPatientName}>
+                          {getSelectedPatient()!.name}{" "}
+                          {getSelectedPatient()!.lastname}
+                        </Text>
+                        <Text style={styles.selectedPatientDni}>
+                          DNI: {getSelectedPatient()!.dni}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Date Selection */}
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Date *</Text>
+                  <Controller
+                    control={control}
+                    name="date"
+                    render={({ field: { onChange, value } }) => (
+                      <CustomCalendar
+                        onChange={(date) => {
+                          onChange(date.toISOString().split("T")[0]);
+                          setSelectedDate(date.toISOString().split("T")[0]);
+                        }}
+                        currentDate={value}
+                        minDate={new Date()}
+                        isValid={errors.date ? false : true}
+                      />
+                    )}
+                  />
+                  {errors.date && (
+                    <ErrorDisplay message={errors.date.message as string} />
+                  )}
+                  <View
+                    style={[
+                      {
+                        opacity: shiftsOfDate.length ? 1 : 0.6,
+                      },
+                      styles.accordionContainer,
+                    ]}
+                  >
+                    <TouchableOpacity
+                      onPress={() => openAccordion()}
+                      style={styles.accordionButton}
+                      disabled={!shiftsOfDate.length || shifLoading}
+                    >
+                      <View style={styles.accordionHeader}>
+                        <Ionicons
+                          name="briefcase-outline"
+                          size={18}
+                          color={colors.mutedForeground}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 16,
+                            color: colors.mutedForeground,
+                          }}
+                        >
+                          Shifts on this date ({shiftsOfDate.length})
+                        </Text>
+                      </View>
+                      <Animated.View style={chevronAnimatedStyle}>
+                        <Ionicons
+                          name="chevron-down"
+                          size={20}
+                          color={colors.mutedForeground}
+                        />
+                      </Animated.View>
+                    </TouchableOpacity>
+                    {shifLoading && (
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.mutedForeground}
+                      />
+                    )}
+                    <ThemedAccordion isExpanded={accordionOpen} viewKey={1}>
+                      <ScrollView
+                        style={{
+                          marginVertical: 10,
+                          maxHeight: 700,
+                        }}
+                        showsVerticalScrollIndicator={true}
+                        nestedScrollEnabled={true}
+                      >
+                        {shiftsOfDate.map((shift) => (
+                          <View
+                            key={`shift_${shift.id}`}
+                            style={styles.shiftItem}
+                          >
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 16,
+                                  color: colors.foreground,
+                                }}
+                              >
+                                {shift.patient?.name} {shift.patient?.lastname}
+                              </Text>
+                            </View>
+                            <View style={{ alignItems: "center" }}>
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  color: colors.mutedForeground,
+                                }}
+                              >
+                                {shift.start_time}
+                              </Text>
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  color: colors.mutedForeground,
+                                }}
+                              >
+                                {shift.duration} minutes
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </ThemedAccordion>
                   </View>
                 </View>
-              )}
-            </View>
 
-            {/* Date Selection */}
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Date *</Text>
-              <Controller
-                control={control}
-                name="date"
-                render={({ field: { onChange, value } }) => (
-                  <CustomCalendar
-                    onChange={(date) => {
-                      onChange(date.toISOString().split("T")[0]);
-                      setSelectedDate(date.toISOString().split("T")[0]);
-                    }}
-                    currentDate={value}
-                    minDate={new Date()}
-                    isValid={errors.date ? false : true}
+                {/* Time Selection */}
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Start Time *</Text>
+                  <Controller
+                    control={control}
+                    name="start_time"
+                    render={({ field: { onChange, value } }) => (
+                      <ThemedSelect
+                        placeholder="Select a time..."
+                        value={value}
+                        disabled={!timeSlots.length}
+                        icon="time-outline"
+                        onValueChange={onChange}
+                        options={timeSlots}
+                        hasError={!!errors.start_time}
+                      />
+                    )}
                   />
-                )}
-              />
-              {errors.date && (
-                <ErrorDisplay message={errors.date.message as string} />
-              )}
-              <View
-                style={[
-                  {
-                    opacity: shiftsOfDate.length ? 1 : 0.6,
-                  },
-                  styles.accordionContainer,
-                ]}
-              >
-                <TouchableOpacity
-                  onPress={() => openAccordion()}
-                  style={styles.accordionButton}
-                  disabled={!shiftsOfDate.length || shifLoading}
-                >
-                  <View style={styles.accordionHeader}>
-                    <Ionicons
-                      name="briefcase-outline"
-                      size={18}
-                      color={colors.mutedForeground}
+                  {errors.start_time && (
+                    <ErrorDisplay
+                      message={errors.start_time.message as string}
                     />
-                    <Text
-                      style={{ fontSize: 16, color: colors.mutedForeground }}
-                    >
-                      Shifts on this date ({shiftsOfDate.length})
-                    </Text>
-                  </View>
-                  <Animated.View style={chevronAnimatedStyle}>
-                    <Ionicons
-                      name="chevron-down"
-                      size={20}
-                      color={colors.mutedForeground}
-                    />
-                  </Animated.View>
-                </TouchableOpacity>
-                {shifLoading && (
-                  <ActivityIndicator
-                    size="small"
-                    color={colors.mutedForeground}
-                  />
-                )}
-                <ThemedAccordion isExpanded={accordionOpen} viewKey={1}>
-                  <ScrollView
-                    style={{
-                      marginVertical: 10,
-                      maxHeight: 700,
-                    }}
-                    showsVerticalScrollIndicator={true}
-                    nestedScrollEnabled={true}
-                  >
-                    {shiftsOfDate.map((shift) => (
-                      <View key={`shift_${shift.id}`} style={styles.shiftItem}>
-                        <View
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <Text
-                            style={{ fontSize: 16, color: colors.foreground }}
-                          >
-                            {shift.patient?.name} {shift.patient?.lastname}
-                          </Text>
-                        </View>
-                        <View style={{ alignItems: "center" }}>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              color: colors.mutedForeground,
-                            }}
-                          >
-                            {shift.start_time}
-                          </Text>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              color: colors.mutedForeground,
-                            }}
-                          >
-                            {shift.duration} minutes
-                          </Text>
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                </ThemedAccordion>
-              </View>
-            </View>
+                  )}
+                </View>
 
-            {/* Time Selection */}
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Start Time *</Text>
-              <Controller
-                control={control}
-                name="start_time"
-                render={({ field: { onChange, value } }) => (
-                  <ThemedSelect
-                    placeholder="Select a time..."
-                    value={value}
-                    disabled={!timeSlots.length}
-                    icon="time-outline"
-                    onValueChange={onChange}
-                    options={timeSlots}
-                    hasError={!!errors.start_time}
+                {/* Duration Selection */}
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Duration *</Text>
+                  <Controller
+                    control={control}
+                    name="duration"
+                    render={({ field: { onChange, value } }) => (
+                      <ThemedSelect
+                        placeholder="Select a duration..."
+                        value={value}
+                        disabled={
+                          !durationOptions.length || selectedDate.trim() === ""
+                        }
+                        icon="hourglass-outline"
+                        onValueChange={onChange}
+                        options={durationOptions}
+                        hasError={!!errors.duration}
+                      />
+                    )}
                   />
-                )}
-              />
-              {errors.start_time && (
-                <ErrorDisplay message={errors.start_time.message as string} />
-              )}
-            </View>
+                  {errors.duration && (
+                    <ErrorDisplay message={errors.duration.message as string} />
+                  )}
+                </View>
 
-            {/* Duration Selection */}
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Duration *</Text>
-              <Controller
-                control={control}
-                name="duration"
-                render={({ field: { onChange, value } }) => (
-                  <ThemedSelect
-                    placeholder="Select a duration..."
-                    value={value}
-                    disabled={
-                      !durationOptions.length || selectedDate.trim() === ""
-                    }
-                    icon="hourglass-outline"
-                    onValueChange={onChange}
-                    options={durationOptions}
-                    hasError={!!errors.duration}
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Description</Text>
+                  <Controller
+                    control={control}
+                    name="details"
+                    render={({ field: { onChange, value } }) => (
+                      <ThemedTextArea
+                        placeholder="Enter shift details"
+                        value={value}
+                        onChangeText={onChange}
+                        hasError={!!errors.details}
+                        icon="document-text-outline"
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                      />
+                    )}
                   />
+                  {errors.details && (
+                    <ErrorDisplay message={errors.details.message as string} />
+                  )}
+                </View>
+                {shiftError && (
+                  <AnimatedView style={{ marginBottom: 18 }}>
+                    <ErrorDisplay message={shiftError.message} />
+                  </AnimatedView>
                 )}
-              />
-              {errors.duration && (
-                <ErrorDisplay message={errors.duration.message as string} />
-              )}
-            </View>
+                <View style={{ gap: 5, paddingBottom: 20 }}>
+                  <ThemedButton
+                    leftIcon="checkmark"
+                    size="large"
+                    variant="primary"
+                    title="Create Shift"
+                    loading={isLoading}
+                    disabled={isLoading || (isEditing && !isDirty) || dateChanged()}
+                    onPress={handleSubmit((data) => onSubmit(data as any))}
+                  />
 
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <Controller
-                control={control}
-                name="details"
-                render={({ field: { onChange, value } }) => (
-                  <ThemedTextArea
-                    placeholder="Enter shift details"
-                    value={value}
-                    onChangeText={onChange}
-                    hasError={!!errors.details}
-                    icon="document-text-outline"
-                    autoCapitalize="words"
-                    autoCorrect={false}
+                  {/* Cancel Button */}
+                  <ThemedButton
+                    leftIcon="close-sharp"
+                    size="large"
+                    variant="ghost"
+                    title="Cancel"
+                    onPress={() => router.back()}
+                    loading={isLoading}
+                    disabled={isLoading}
                   />
-                )}
-              />
-              {errors.details && (
-                <ErrorDisplay message={errors.details.message as string} />
-              )}
-            </View>
-            {shiftError && (
-              <AnimatedView style={{ marginBottom: 18 }}>
-                <ErrorDisplay message={shiftError.message} />
-              </AnimatedView>
+                </View>
+              </>
             )}
-            <View style={{ gap: 5, paddingBottom: 20 }}>
-              <ThemedButton
-                leftIcon="checkmark"
-                size="large"
-                variant="primary"
-                title="Create Shift"
-                loading={isLoading}
-                disabled={isLoading}
-                onPress={handleSubmit((data) => onSubmit(data as any))}
-              />
-
-              {/* Cancel Button */}
-              <ThemedButton
-                leftIcon="close-sharp"
-                size="large"
-                variant="ghost"
-                title="Cancel"
-                onPress={() => router.back()}
-                loading={isLoading}
-                disabled={isLoading}
-              />
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

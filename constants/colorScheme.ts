@@ -83,7 +83,7 @@ export const colorPalette = {
         destructiveMuted: "#2d1b1b",
         destructiveMutedForeground: "#f87171",
         destructiveAccent: "#f87171",
-        destructiveAccentForeground: "#ffffff",
+        destructiveAccentForeground: "#fcd4d4",
         warning: "#f59e0b",
         warningForeground: "#ffffff",
         warningMuted: "#2d2416",

@@ -78,8 +78,6 @@ const ThemedCheckbox = ({
 }: ThemedCheckboxProps) => {
   const colors = useThemeColors();
 
-  // Animation values
-  const opacity = useSharedValue(1);
   const backgroundColorProgress = useSharedValue(0);
   const scale = useSharedValue(1);
 

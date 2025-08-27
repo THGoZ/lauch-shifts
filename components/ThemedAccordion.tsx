@@ -1,11 +1,15 @@
 import { useThemeColors } from "@/hooks/useThemeColors";
+import React, { useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
-    SharedValue,
-    useAnimatedStyle,
-    useDerivedValue,
-    useSharedValue,
-    withTiming,
+  measure,
+  runOnUI,
+  SharedValue,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withTiming,
+  useAnimatedRef,
 } from "react-native-reanimated";
 
 interface ThemedAccordionProps {
@@ -23,7 +27,8 @@ const ThemedAccordion = ({
   viewKey,
   duration = 300,
 }: ThemedAccordionProps) => {
-  const colors = useThemeColors();
+  const wrapperRef = useAnimatedRef<View>();
+
   const styles = StyleSheet.create({
     wrapper: {
       width: "100%",
@@ -35,27 +40,40 @@ const ThemedAccordion = ({
       overflow: "hidden",
     },
   });
-  const height = useSharedValue(0);
+
+  const contentHeight = useSharedValue(0);
 
   const derivedHeight = useDerivedValue(() =>
-    withTiming(height.value * Number(isExpanded.value), {
+    withTiming(isExpanded.value ? contentHeight.value : 0, {
       duration,
     })
   );
-  const bodyStyle = useAnimatedStyle(() => ({
+
+  const animatedStyle = useAnimatedStyle(() => ({
     height: derivedHeight.value,
   }));
+
+  const onLayoutReady = () => {
+    if (wrapperRef.current) {
+      runOnUI(() => {
+        const measured = measure(wrapperRef);
+        if (measured) {
+          contentHeight.value = measured.height;
+        }
+      })();
+    }
+  };
 
   return (
     <Animated.View
       key={`accordionItem_${viewKey}`}
-      style={[styles.animatedView, bodyStyle, style]}
+      style={[styles.animatedView, animatedStyle, style]}
     >
       <View
-        onLayout={(e) => {
-          height.value = e.nativeEvent.layout.height;
-        }}
+        ref={wrapperRef}
+        onLayout={onLayoutReady}
         style={styles.wrapper}
+        collapsable={false} // ensure `ref` works
       >
         {children}
       </View>

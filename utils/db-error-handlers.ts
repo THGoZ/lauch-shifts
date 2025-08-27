@@ -1,3 +1,4 @@
+import { FieldError } from "@/interfaces/interface";
 
 export function parseSQLiteErrorFields(error: unknown): FieldError[] {
   if (!error || typeof error !== 'object') return [];

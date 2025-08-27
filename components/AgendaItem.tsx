@@ -1,18 +1,18 @@
 import { useThemeColors } from "@/hooks/useThemeColors";
-import {
-  durationAddition,
-  formatTime
-} from "@/services/shifts/shift.helpers";
+import { durationAddition, formatTime } from "@/services/shifts/shift.helpers";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface ItemProps {
   item: any;
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onSelectToggle?: (itemId: string | number) => void;
 }
 
 const AgendaItem = (props: ItemProps) => {
-  const { item } = props as any;
+  const { item, isSelectMode, isSelected, onSelectToggle } = props as any;
   const colors = useThemeColors();
 
   const styles = StyleSheet.create({
@@ -21,7 +21,7 @@ const AgendaItem = (props: ItemProps) => {
       borderRadius: 12,
       padding: 16,
       marginHorizontal: 8,
-      marginTop: 10,
+      marginVertical: 8,
       borderWidth: 1,
       borderColor: colors.border,
       shadowColor: colors.foreground,
@@ -32,9 +32,6 @@ const AgendaItem = (props: ItemProps) => {
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
-    },
-    firstShiftCard: {
-      marginTop: 16,
     },
     shiftHeader: {
       flexDirection: "row",
@@ -98,7 +95,6 @@ const AgendaItem = (props: ItemProps) => {
     emptyDateText: {
       fontSize: 16,
       color: colors.mutedForeground,
-      marginTop: 8,
     },
   });
 
@@ -140,21 +136,21 @@ const AgendaItem = (props: ItemProps) => {
   const endTime = durationAddition(item.start_time, item.duration);
 
   const buttonPressed = useCallback(() => {
-    if(item.onPress) {
+    if (item.onPress) {
       item.onPress();
     }
   }, []);
 
   const itemPressed = useCallback(() => {
-    Alert.alert(item.id.toString());
+    onSelectToggle(item.id as any);
   }, [item]);
 
-  if (!item) {
+  if (!item || Object.keys(item).length === 0 || !item.id) {
     return (
       <View style={styles.emptyDate}>
         <Ionicons
           name="calendar-outline"
-          size={32}
+          size={1}
           color={colors.mutedForeground}
         />
         <Text style={styles.emptyDateText}>No shifts scheduled</Text>
@@ -169,21 +165,29 @@ const AgendaItem = (props: ItemProps) => {
       onLongPress={() => itemPressed()}
       activeOpacity={0.7}
     >
+      {isSelectMode && (
+        <TouchableOpacity
+          style={styles.shiftHeader}
+          onPress={() => onSelectToggle(item.id)}
+        >
+          <Ionicons
+            name={isSelected ? "checkmark-circle" : "square-outline"}
+            size={24}
+            color={colors.foreground}
+          />
+        </TouchableOpacity>
+      )}
       <View style={styles.shiftHeader}>
         <View style={styles.timeContainer}>
-          <Text style={styles.shiftTime}>
-            {formatTime(item.start_time)} 
-          </Text>
-          <Text style={styles.shiftTime}>
-            {endTime}
-          </Text>
+          <Text style={styles.shiftTime}>{formatTime(item.start_time)}</Text>
+          <Text style={styles.shiftTime}>{endTime}</Text>
         </View>
 
         <View style={styles.shiftInfo}>
-          <Text style={styles.patientName}>
-            {getfullName()}
+          <Text style={styles.patientName}>{getfullName()}</Text>
+          <Text style={styles.patientDni}>
+            DNI: {item.patient ? item.patient.dni : "Unknown"}
           </Text>
-          <Text style={styles.patientDni}>DNI: {item.patient ? item.patient.dni : "Unknown"}</Text>
         </View>
 
         <View style={styles.statusContainer}>
@@ -197,6 +201,16 @@ const AgendaItem = (props: ItemProps) => {
   );
 };
 
-export default React.memo(AgendaItem, (prev, next) => {
-  return prev.item.id === next.item.id;
-});
+export default React.memo(
+  AgendaItem,
+  (prev, next) =>
+    prev.item.id === next.item.id &&
+    prev.item.date === next.item.date &&
+    prev.item.start_time === next.item.start_time &&
+    prev.item.duration === next.item.duration &&
+    prev.item.status === next.item.status &&
+    prev.item.details === next.item.details &&
+    prev.item.reason_incomplete === next.item.reason_incomplete &&
+    prev.isSelectMode === next.isSelectMode &&
+    prev.isSelected === next.isSelected
+);

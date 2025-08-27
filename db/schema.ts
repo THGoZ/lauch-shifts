@@ -23,6 +23,7 @@ export const shift = sqliteTable('shift', {
   status: text({ enum: ['pending', 'confirmed', 'canceled'] }).notNull().default('pending'),
   reason_incomplete: text(),
   details: text(),
+  reprogramed: integer({ mode: 'boolean' }).notNull().default(false),
   ...timestamps
 });
 

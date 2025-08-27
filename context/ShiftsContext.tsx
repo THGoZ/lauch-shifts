@@ -1,9 +1,13 @@
 import { Shifts as ShiftsDB } from "@/db/domain/shifts/shifts";
-import { Filter } from "@/db/domain/utils/queryHandle";
+import { CompareFilter, Filter } from "@/db/domain/utils/queryHandle";
 import { shift, Shift } from "@/db/schema";
 import { returnResult } from "@/domain/entities/db-result";
 import { CustomError } from "@/domain/entities/error-entity";
-import { PagedResult, ResultItem, ShiftWithPatient } from "@/interfaces/interface";
+import {
+  PagedResult,
+  ResultItem,
+  ShiftWithPatient,
+} from "@/interfaces/interface";
 import { createContext, useContext, useEffect, useState } from "react";
 
 interface ShiftsContextType {
@@ -14,15 +18,21 @@ interface ShiftsContextType {
     filters?: Filter<typeof shift>[],
     include_patient?: boolean,
     page?: number,
-    limit?: number
+    limit?: number,
+    compareFilters?: CompareFilter<typeof shift>[],
+    updateShifts?: boolean
   ) => Promise<ResultItem<PagedResult<ShiftWithPatient>>>;
   addShift: (shift: Omit<Shift, "id">) => Promise<ResultItem<Shift>>;
-  updateShift: (id: number, shift: Partial<Omit<Shift, "id">>) => Promise<void>;
+  updateShift: (
+    id: number,
+    shift: Partial<Omit<Shift, "id">>
+  ) => Promise<ResultItem<Shift>>;
   addShiftBulk: (shifts: Omit<Shift, "id">[]) => Promise<boolean>;
   deleteShift: (id: number) => Promise<void>;
-  getShiftByDate: (date: string) => Promise<ShiftWithPatient[]>;
+  getShiftByDate: (date: string) => Promise<ResultItem<ShiftWithPatient[]>>;
   getPureShifts: () => Promise<Shift[]>;
   getPureShiftsOfDate: (date: string) => Promise<Shift[]>;
+  getShiftById: (id: number) => Promise<ResultItem<ShiftWithPatient>>;
   countActiveShifts: () => Promise<void>;
   error: CustomError | null;
   isLoading: boolean;
@@ -48,7 +58,9 @@ export const ShiftsProvider: React.FC<{ children: React.ReactNode }> = ({
     filters?: Filter<typeof shift>[],
     include_patient = true,
     page?: number,
-    limit?: number
+    limit?: number,
+    compareFilters?: CompareFilter<typeof shift>[],
+    updateShifts: boolean = true
   ): Promise<ResultItem<PagedResult<ShiftWithPatient>>> => {
     setIsLoading(true);
     try {
@@ -57,9 +69,12 @@ export const ShiftsProvider: React.FC<{ children: React.ReactNode }> = ({
         filters,
         include_patient,
         page,
-        limit
+        limit,
+        compareFilters
       );
-      setShifts(response);
+      if (updateShifts) {
+        setShifts(response);
+      }
       return returnResult("Patientes obtenidos correctamente", true, response);
     } catch (error) {
       if (error instanceof Error) {
@@ -126,18 +141,20 @@ export const ShiftsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const updateShift = async (id: number, shift: Partial<Omit<Shift, "id">>) => {
+  const updateShift = async (
+    id: number,
+    shift: Partial<Omit<Shift, "id">>
+  ): Promise<ResultItem<Shift>> => {
     setIsLoading(true);
     setError(null);
     try {
-      await ShiftsDB.update(id, shift);
-      await getShifts();
+      const result = await ShiftsDB.update(id, shift);
+      return returnResult("Turno actualizado correctamente", true, result);
     } catch (error) {
-      if (error instanceof CustomError) {
-        setError(error);
-      } else {
-        setError(new CustomError("Error al actualizar el turno"));
+      if (error instanceof Error) {
+        return returnResult(error.message, false, null, error);
       }
+      return returnResult("Error al obtener los pacientes", false, null, error);
     } finally {
       setIsLoading(false);
     }
@@ -180,20 +197,35 @@ export const ShiftsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const getShiftByDate = async (date: string): Promise<ShiftWithPatient[]> => {
+  const getShiftByDate = async (date: string): Promise<ResultItem<ShiftWithPatient[]>> => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await ShiftsDB.getAllOfDate(date);
-      return response;
+      return returnResult("Turno obtenidos correctamente", true, response);
     } catch (error) {
-      if (error instanceof CustomError) {
-        setError(error);
-        return [];
-      } else {
-        setError(new CustomError("Error al obtener los turnos"));
-        return [];
+      if (error instanceof Error) {
+        return returnResult(error.message, false, null, error);
       }
+      return returnResult("Error al obtener los pacientes", false, null, error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getShiftById = async (
+    id: number
+  ): Promise<ResultItem<ShiftWithPatient>> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await ShiftsDB.getById(id);
+      return returnResult("Turno obtenido correctamente", true, response);
+    } catch (error) {
+      if (error instanceof Error) {
+        return returnResult(error.message, false, null, error);
+      }
+      return returnResult("Error al obtener el paciente", false, null, error);
     } finally {
       setIsLoading(false);
     }
@@ -235,6 +267,7 @@ export const ShiftsProvider: React.FC<{ children: React.ReactNode }> = ({
         getShiftByDate,
         getPureShifts,
         getPureShiftsOfDate,
+        getShiftById,
         activeShiftsCount,
         countActiveShifts,
         error,

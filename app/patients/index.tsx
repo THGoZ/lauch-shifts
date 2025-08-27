@@ -1,7 +1,12 @@
+import CrudItem from "@/components/CrudItem";
+import CrudList from "@/components/CrudList";
 import DeleteModal from "@/components/DeleteModal";
+import ItemDetailsModal from "@/components/ItemsDetailModal";
+import { SortOption } from "@/components/ThemedSortSelect";
 import { usePatients } from "@/context/PatientsContext";
 import { useToast } from "@/context/ToastContext";
-import { Patient } from "@/db/schema";
+import { SortValue } from "@/db/domain/utils/queryHandle";
+import { patient, Patient } from "@/db/schema";
 import { CustomError } from "@/domain/entities/error-entity";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,19 +14,37 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
-  FlatList,
-  RefreshControl,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 
+const sortOptions: SortOption[] = [
+  {
+    field: "name",
+    label: "Name",
+    order: "asc",
+  },
+  {
+    field: "lastname",
+    label: "Lastname",
+    order: "asc",
+  },
+  {
+    field: "dni",
+    label: "DNI",
+    order: "asc",
+  },
+  {
+    field: "created_at",
+    label: "Created",
+    order: "desc",
+  },
+];
 export default function PatientsScreen() {
   const colors = useThemeColors();
 
@@ -185,7 +208,7 @@ export default function PatientsScreen() {
       fontWeight: "bold",
       color: colors.primaryForeground,
     },
-    deleteModalContainer: {
+    modalContainer: {
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
@@ -199,6 +222,14 @@ export default function PatientsScreen() {
 
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [deleteItem, setDeleteItem] = useState<Patient | null>(null);
+  const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
+  const [detailsItem, setDetailsItem] = useState<Patient | null>(null);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [inSelectionMode, setInSelectionMode] = useState(false);
+  const [sortOption, setSortOption] = useState<SortValue<typeof patient>>({
+    field: sortOptions[0].field as keyof Patient,
+    order: sortOptions[0].order as "asc" | "desc",
+  });
 
   const {
     getPatients,
@@ -206,12 +237,22 @@ export default function PatientsScreen() {
     isLoading: patientsLoading,
     deletePatient,
   } = usePatients();
-  const {showToast} = useToast();
+  const { showToast } = useToast();
 
   const loadData = async () => {
-    const result = await getPatients(searchQuery, page);
-    if(!result.success) {
-      showToast("error", "There has been an error fetching patients", result.error.message);
+    const result = await getPatients(
+      searchQuery,
+      page,
+      undefined,
+      undefined,
+      sortOption
+    );
+    if (!result.success) {
+      showToast(
+        "error",
+        "There has been an error fetching patients",
+        result.error.message
+      );
     }
     setRefreshing(false);
   };
@@ -222,7 +263,7 @@ export default function PatientsScreen() {
     };
 
     fetchPatients();
-  }, [page, reloadKey]);
+  }, [page, reloadKey, sortOption]);
 
   useFocusEffect(
     useCallback(() => {
@@ -277,6 +318,40 @@ export default function PatientsScreen() {
     loadData();
   };
 
+  const handleEditPatient = (patient: Patient) => {
+    router.push(`/patients/${patient.id}`);
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedItems((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelectedItems(
+      contextPatients.data.map((patient) =>
+        patient.id ? patient.id.toString() : ""
+      )
+    );
+    setInSelectionMode(true);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedItems([]);
+    setInSelectionMode(false);
+  };
+
+  const handleViewDetails = (patient: Patient) => {
+    setDetailsItem(patient);
+    setIsDetailsModalVisible(true);
+  };
+
+  const handleCloseViewDetails = () => {
+    setIsDetailsModalVisible(false);
+    setDetailsItem(null);
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -286,84 +361,47 @@ export default function PatientsScreen() {
     });
   };
 
-  const renderPatientCard = ({ item }: { item: Patient }) => (
-      <TouchableOpacity style={styles.patientCard}>
-        <View style={styles.patientHeader}>
-          <View style={styles.avatarContainer}>
-            <LinearGradient
-              colors={[colors.primary, colors.accent]}
-              style={styles.avatar}
-            >
-              <Text style={styles.avatarText}>
-                {item.name.charAt(0)}
-                {item.lastname.charAt(0)}
-              </Text>
-            </LinearGradient>
-          </View>
-
-          <View style={styles.patientInfo}>
-            <Text style={styles.patientName}>
-              {item.name} {item.lastname}
+  const renderPatientCard = (
+    item: Patient,
+    isSelected: boolean,
+    onSelect: (id: string) => void
+  ) => (
+    <CrudItem
+      id={(item.id ?? "").toString()}
+      isSelected={isSelected}
+      onSelect={onSelect}
+      onEdit={() => handleEditPatient(item as Patient)}
+      onDelete={() => handleDeletePatient(item as Patient)}
+      onViewDetails={() => handleViewDetails(item as Patient)}
+      inSelectionMode={inSelectionMode}
+      setInSelectionMode={setInSelectionMode}
+    >
+      <View style={styles.patientHeader}>
+        <View style={styles.avatarContainer}>
+          <LinearGradient
+            colors={[colors.primary, colors.accent]}
+            style={styles.avatar}
+          >
+            <Text style={styles.avatarText}>
+              {item.name.charAt(0)}
+              {item.lastname.charAt(0)}
             </Text>
-            <Text style={styles.patientDni}>DNI: {item.dni}</Text>
-            {item.created_at && (
-              <Text style={styles.patientDate}>
-                Created: {formatDate(item.created_at.toString())}
-              </Text>
-            )}
-          </View>
-
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => router.push(`/patients/${item.id}`)}
-            >
-              <Ionicons name="pencil" size={18} color={colors.primary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeletePatient(item as Patient)}
-            >
-              <Ionicons
-                name="trash-outline"
-                size={18}
-                color={colors.destructive}
-              />
-            </TouchableOpacity>
-          </View>
+          </LinearGradient>
         </View>
-      </TouchableOpacity>
-  );
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      {patientsLoading ? (
-        <ActivityIndicator size="large" color={colors.primary} />
-      ) : (
-        <>
-          <Ionicons
-            name="people-outline"
-            size={64}
-            color={colors.mutedForeground}
-          />
-          <Text style={styles.emptyTitle}>No patients found</Text>
-          <Text style={styles.emptySubtitle}>
-            {searchQuery
-              ? "Try adjusting your search"
-              : "Add your first patient to get started"}
+        <View style={styles.patientInfo}>
+          <Text style={styles.patientName}>
+            {item.name} {item.lastname}
           </Text>
-          {!searchQuery && (
-            <TouchableOpacity
-              style={styles.addFirstButton}
-              onPress={() => router.push("/patients/create")}
-            >
-              <Text style={styles.addFirstButtonText}>Add Patient</Text>
-            </TouchableOpacity>
+          <Text style={styles.patientDni}>DNI: {item.dni}</Text>
+          {item.created_at && (
+            <Text style={styles.patientDate}>
+              Created: {formatDate(item.created_at.toString())}
+            </Text>
           )}
-        </>
-      )}
-    </View>
+        </View>
+      </View>
+    </CrudItem>
   );
 
   return (
@@ -394,64 +432,87 @@ export default function PatientsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Ionicons name="search" size={20} color={colors.mutedForeground} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search patients..."
-            placeholderTextColor={colors.mutedForeground}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={colors.mutedForeground}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Stats */}
-      <View style={styles.statsContainer}>
-        <Text style={styles.statsText}>
-          {contextPatients.total} patient
-          {contextPatients.data.length !== 1 ? "s" : ""} found
-        </Text>
-      </View>
-
-      {/* Patients List */}
-      <FlatList
-        data={contextPatients.data}
-        renderItem={renderPatientCard}
-        keyExtractor={(item) => (item.id as number).toString()}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[colors.primary]}
-            tintColor={colors.primary}
-          />
+      <CrudList
+        items={contextPatients.data}
+        isLoading={patientsLoading}
+        onRefresh={onRefresh}
+        isRefreshing={refreshing}
+        searchTerm={searchQuery}
+        onSearchTermChange={setSearchQuery}
+        onClearSearch={() => setSearchQuery("")}
+        sortOptions={sortOptions}
+        onSortChange={(sortOption) =>
+          setSortOption(sortOption as SortValue<typeof patient>)
         }
-        ListEmptyComponent={renderEmptyState}
-      />
-      <View style={styles.deleteModalContainer}>
+        selectedSortOption={sortOption}
+        selectedItems={selectedItems}
+        onSelectItem={handleToggleSelect}
+        onSelectAll={handleSelectAll}
+        onClearSelection={handleClearSelection}
+        renderItem={renderPatientCard}
+        getItemId={(item) => (item.id ?? "").toString()}
+        emptyState={{
+          icon: "people-outline",
+          title: "No patients found",
+          description: "Try adjusting your search",
+          action: () => router.push("/patients/create"),
+          actionLabel: "Add patient",
+          actionIcon: "add",
+        }}
+      ></CrudList>
+      <View style={styles.modalContainer}>
         <DeleteModal
-        title="Delete Patient"
-        description="Are you sure you want to delete"
-        itemName={deleteItem?.name + " " + deleteItem?.lastname}
+          title="Delete Patient"
+          description="Are you sure you want to delete"
+          itemName={deleteItem?.name + " " + deleteItem?.lastname}
           isVisible={isDeleteModalVisible}
           onDelete={handleDelete}
           onCancel={handleCancelDelete}
           item={deleteItem}
         />
+      </View>
+      <View style={styles.modalContainer}>
+        {detailsItem && (
+          <ItemDetailsModal
+            title="Patient Details"
+            subtitle="View Patient Details"
+            isOpen={isDetailsModalVisible}
+            onClose={handleCloseViewDetails}
+            onEdit={() => handleEditPatient(detailsItem)}
+            onDelete={() => handleDeletePatient(detailsItem)}
+            metadata={[
+              {
+                label: "Name",
+                value: detailsItem.name + " " + detailsItem.lastname,
+              },
+              {
+                label: "DNI",
+                value: detailsItem.dni,
+              },
+              {
+                label: "Created",
+                value: formatDate(
+                  detailsItem?.created_at
+                    ? detailsItem.created_at.toString()
+                    : ""
+                ),
+              },
+            ]}
+            showDefaultActions={true}
+            actions={[
+              {
+                label: "View schedule",
+                onPress: () => {
+                  router.push(`/patients/${detailsItem.id}/schedule`);
+                  setIsDeleteModalVisible(false);
+                  setIsDetailsModalVisible(false);
+                },
+                variant: "secondary",
+                icon: "calendar-outline",
+              }
+            ]}
+          />
+        )}
       </View>
     </SafeAreaView>
   );

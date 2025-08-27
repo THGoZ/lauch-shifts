@@ -2,7 +2,6 @@ import { usePatients } from "@/context/PatientsContext";
 import { useShifts } from "@/context/ShiftsContext";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { Ionicons } from "@expo/vector-icons";
-import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
@@ -27,7 +26,6 @@ export default function IndexScreen() {
   const { patientsCount, isLoading: patientsLoading } = usePatients();
 
   const db = useSQLiteContext();
-  useDrizzleStudio(db);
 
   const handleCreateShift = () => {
     router.push("/shifts/calendar");
@@ -130,9 +128,9 @@ export default function IndexScreen() {
       borderColor: colors.border,
       backgroundColor: colors.background,
       shadowColor: colors.foreground,
-      shadowOffset: {
-        width: 0,
-        height: 2,
+      shadowOffset: { 
+        width: 0, 
+        height: 2 
       },
       shadowOpacity: 0.1,
       shadowRadius: 4,

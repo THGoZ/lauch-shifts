@@ -3,11 +3,12 @@ import { db } from "@/db/db";
 import type { Shift } from "@/db/schema";
 import { patient, shift } from "@/db/schema";
 import { CustomError } from "@/domain/entities/error-entity";
+import { ShiftUpdate } from "@/interfaces/interface";
 import { checkOverLappingAndThrowFields, newOverlapping } from "@/services/shifts/shift.helpers";
 import { parseSQLiteErrorFields } from "@/utils/db-error-handlers";
 import { and, eq, ne } from "drizzle-orm";
 import { countDbQuery } from "../shared/common";
-import { buildFilterConditions, buildSearchConditions, Filter, paginationValues } from "../utils/queryHandle";
+import { buildCompareFilterConditions, buildFilterConditions, buildSearchConditions, CompareFilter, Filter, paginationValues } from "../utils/queryHandle";
 
 export class Shifts {
 
@@ -97,13 +98,16 @@ export class Shifts {
         include_patient = false,
         page?: number,
         limit?: number,
+        compareFilters: CompareFilter<typeof shift>[] = []
     ) {
         const searchClause = buildSearchConditions(shift, search, ["patient_id", "date"]);
         const filterClause = buildFilterConditions(shift, filters);
+        const compareFilterClause = buildCompareFilterConditions(shift, compareFilters);
 
         const whereClause = and(
             ...(searchClause ? [searchClause] : []),
-            ...(filterClause ? [filterClause] : [])
+            ...(filterClause ? [filterClause] : []),
+            ...(compareFilterClause ? [compareFilterClause] : [])
         );
 
         const count = await countDbQuery(shift, whereClause);
@@ -209,22 +213,53 @@ export class Shifts {
     }
 
 
-    static async getById(id: number) {
-        const [found] = await db.select().from(shift).where(eq(shift.id, id));
+    static async getById(id: number, include_patient = true) {
+        const [found] = await db.select({
+                id: shift.id,
+                patient_id: shift.patient_id,
+                date: shift.date,
+                start_time: shift.start_time,
+                duration: shift.duration,
+                status: shift.status,
+                reason_incomplete: shift.reason_incomplete,
+                details: shift.details,
+                updated_at: shift.updated_at,
+                created_at: shift.created_at,
+                ...(include_patient
+                    ? {
+                        patient: {
+                            name: patient.name,
+                            lastname: patient.lastname,
+                            dni: patient.dni,
+                            id: patient.id,
+                            created_at: patient.created_at,
+                            updated_at: patient.updated_at,
+                            deleted_at: patient.deleted_at,
+                        }
+                    }
+                    : {}),
+            }).from(shift).where(eq(shift.id, id)).innerJoin(patient, eq(shift.patient_id, patient.id));
         return found;
     }
 
-    static async update(id: number, data: Partial<Omit<Shift, "id">>) {
+    static async update(id: number, data: ShiftUpdate) {
         try {
             const existingShift = await this.getById(id);
-            if (existingShift.date !== data.date || existingShift.start_time !== data.start_time || existingShift.duration !== data.duration) {
-                const existingShifts = await this.getAllOfDate(data.date ?? existingShift.date);
-                checkOverLappingAndThrowFields(existingShifts, data.start_time ?? existingShift.start_time, data.duration ?? existingShift.duration);
+            if (data.date || data.start_time || data.duration) {
+                if (existingShift.date !== data.date || existingShift.start_time !== data.start_time || existingShift.duration !== data.duration) {
+                    const existingShifts = await this.getAllOfDate(data.date ?? existingShift.date);
+                    checkOverLappingAndThrowFields(existingShifts, data.start_time ?? existingShift.start_time, data.duration ?? existingShift.duration);
+                }
             }
             const [updated] = await db
                 .update(shift)
                 .set({
-                    ...data,
+                    date: data.date ?? existingShift.date,
+                    start_time: data.start_time ?? existingShift.start_time,
+                    duration: data.duration ?? existingShift.duration,
+                    status: data.status ?? existingShift.status,
+                    reason_incomplete: data.reason_incomplete ?? existingShift.reason_incomplete,
+                    details: data.details ?? existingShift.details,
                     updated_at: new Date(),
                 })
                 .where(eq(shift.id, id))

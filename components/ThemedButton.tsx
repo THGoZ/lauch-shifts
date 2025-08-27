@@ -174,8 +174,8 @@ const ThemedButton = ({
     switch (size) {
       case "small":
         return {
-          paddingHorizontal: iconOnly ? 8 : 12,
-          paddingVertical: 8,
+          paddingHorizontal: iconOnly ? 4 : 12,
+          paddingVertical: iconOnly ? 6 : 8,
           fontSize: 14,
           iconSize: 18,
           minHeight: 32,

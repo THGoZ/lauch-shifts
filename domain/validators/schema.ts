@@ -16,7 +16,13 @@ const shiftSchema = joi.object({
   details: joi.string().optional().min(10).max(500),
 });
 
+const updateStatusSchema = joi.object({
+  status: joi.string().required().valid('pending', 'confirmed', 'canceled'),
+  reason_incomplete: joi.string().optional().min(4).max(500).allow('', null),
+});
+
 export default {
     patientSchema,
     shiftSchema,
+    updateStatusSchema
 }

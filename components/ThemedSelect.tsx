@@ -10,13 +10,13 @@ import {
   View,
 } from "react-native";
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import ThemedAccordion from "./ThemedAccordion";
 
 interface SelectOption {
   label: string;
@@ -45,7 +45,6 @@ const ThemedSelect = ({
   maxDropdownHeight = 300,
 }: ThemedSelectProps) => {
   const colors = useThemeColors();
-  const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const filteredOptions = options.filter((option) =>
@@ -57,17 +56,20 @@ const ThemedSelect = ({
       position: "relative",
       flex: 1,
     },
+    expandableContainer: {
+      flex: 1,
+      backgroundColor: colors.muted,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: hasError ? colors.destructive : colors.border,
+    },
     selectButton: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: colors.muted,
-      borderTopEndRadius: 12,
-      borderTopStartRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
       gap: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 16,
     },
     selectButtonError: {
       borderColor: colors.destructive,
@@ -86,8 +88,6 @@ const ThemedSelect = ({
     },
     modalContent: {
       backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
       borderBottomLeftRadius: 16,
       borderBottomRightRadius: 16,
       overflow: "hidden",
@@ -168,32 +168,16 @@ const ThemedSelect = ({
   const shakeX = useSharedValue(0);
   const scaleValue = useSharedValue(1);
   const chevronRotation = useSharedValue(0);
-  const modalScale = useSharedValue(0);
-  const modalOpacity = useSharedValue(0);
-  const boderRadius = useSharedValue(16);
+  const isAccordionOpen = useSharedValue(false);
 
   // Animated styles
   const containerAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shakeX.value }, { scale: scaleValue.value }],
+    transform: [{ translateX: shakeX.value }],
   }));
 
   const chevronAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${chevronRotation.value}deg` }],
   }));
-
-  const borderRadiusAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      borderBottomStartRadius: boderRadius.value,
-      borderBottomEndRadius: boderRadius.value,
-    };
-  });
-
-  const dropdownAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: modalOpacity.value,
-      transform: [{ scaleY: modalScale.value }],
-    };
-  });
 
   // Animation functions
   const triggerShake = () => {
@@ -210,22 +194,13 @@ const ThemedSelect = ({
 
   const openModal = () => {
     setSearchTerm("");
-    setIsOpen(true);
-    modalOpacity.value = withTiming(1, { duration: 250 });
-    modalScale.value = withTiming(1, { duration: 250 });
+    isAccordionOpen.value = true;
     chevronRotation.value = withSpring(180, { damping: 12, stiffness: 200 });
-    boderRadius.value = withSpring(0, { damping: 12, stiffness: 200 });
   };
 
   const closeModal = () => {
-    modalOpacity.value = withTiming(0, { duration: 200 });
-    modalScale.value = withTiming(0, { duration: 200 });
     chevronRotation.value = withSpring(0, { damping: 12, stiffness: 200 });
-    boderRadius.value = withSpring(16, { damping: 12, stiffness: 200 });
-
-    setTimeout(() => {
-      runOnJS(setIsOpen)(false);
-    }, 200);
+    isAccordionOpen.value = false;
   };
 
   const handlePress = () => {
@@ -235,7 +210,7 @@ const ThemedSelect = ({
       withTiming(0.95, { duration: 100 }),
       withSpring(1, { damping: 10, stiffness: 200 })
     );
-    if (!isOpen) openModal();
+    if (!isAccordionOpen.value) openModal();
     else closeModal();
   };
 
@@ -255,110 +230,114 @@ const ThemedSelect = ({
   return (
     <>
       <Animated.View style={[styles.container, containerAnimatedStyle]}>
-        <TouchableOpacity
-          onPress={handlePress}
-          disabled={disabled}
-          activeOpacity={0.7}
-        >
-          <Animated.View
-            style={[
-              styles.selectButton,
-              hasError && styles.selectButtonError,
-              disabled && styles.selectButtonDisabled,
-              borderRadiusAnimatedStyle,
-            ]}
+        <View style={styles.expandableContainer}>
+          <TouchableOpacity
+            onPress={handlePress}
+            disabled={disabled}
+            activeOpacity={0.7}
           >
-            {icon && (
-              <Ionicons
-                name={icon}
-                size={20}
-                color={
-                  hasError
-                    ? colors.destructiveForeground
-                    : colors.mutedForeground
-                }
-              />
-            )}
-            <Text style={[styles.text, !selectedOption && styles.placeholder]}>
-              {selectedOption ? selectedOption.label : placeholder}
-            </Text>
-            <Animated.View style={chevronAnimatedStyle}>
-              <Ionicons
-                name="chevron-down"
-                size={20}
-                color={
-                  hasError
-                    ? colors.destructiveForeground
-                    : colors.mutedForeground
-                }
-              />
-            </Animated.View>
-          </Animated.View>
-        </TouchableOpacity>
-      </Animated.View>
-      {isOpen && (
-        <Animated.View style={[styles.modalContent, dropdownAnimatedStyle]}>
-          <View style={styles.searchWrapper}>
-            <TextInput
-              placeholder="Search..."
-              placeholderTextColor={colors.mutedForeground}
-              style={styles.searchInput}
-              value={searchTerm}
-              onChangeText={setSearchTerm}
-            />
-          </View>
-          {filteredOptions.length === 0 ? (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIcon}>
+            <Animated.View
+              style={[
+                styles.selectButton,
+                hasError && styles.selectButtonError,
+                disabled && styles.selectButtonDisabled,
+              ]}
+            >
+              {icon && (
                 <Ionicons
-                  name="list-outline"
-                  size={48}
-                  color={colors.mutedForeground}
+                  name={icon}
+                  size={20}
+                  color={
+                    hasError
+                      ? colors.destructiveForeground
+                      : colors.mutedForeground
+                  }
+                />
+              )}
+              <Text
+                style={[styles.text, !selectedOption && styles.placeholder]}
+              >
+                {selectedOption ? selectedOption.label : placeholder}
+              </Text>
+              <Animated.View style={chevronAnimatedStyle}>
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={
+                    hasError
+                      ? colors.destructiveForeground
+                      : colors.mutedForeground
+                  }
+                />
+              </Animated.View>
+            </Animated.View>
+          </TouchableOpacity>
+          <ThemedAccordion isExpanded={isAccordionOpen} viewKey={1}>
+            <View style={styles.modalContent}>
+              <View style={styles.searchWrapper}>
+                <TextInput
+                  placeholder="Search..."
+                  placeholderTextColor={colors.mutedForeground}
+                  style={styles.searchInput}
+                  value={searchTerm}
+                  onChangeText={setSearchTerm}
                 />
               </View>
-              <Text style={styles.emptyText}>No options available</Text>
-            </View>
-          ) : (
-            <ScrollView
-              style={styles.scrollView}
-              showsVerticalScrollIndicator={true}
-              bounces={false}
-              nestedScrollEnabled={true}
-            >
-              {filteredOptions.map((option, index) => (
-                <TouchableOpacity
-                  key={`${option.value}-${index}`}
-                  style={[
-                    styles.option,
-                    index === filteredOptions.length - 1 && styles.optionLast,
-                    option.value === value && styles.optionSelected,
-                  ]}
-                  onPress={() => handleOptionSelect(option.value)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      option.value === value && styles.optionTextSelected,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                  <View style={styles.checkIcon}>
-                    {option.value === value && (
-                      <Ionicons
-                        name="checkmark"
-                        size={20}
-                        color={colors.primary}
-                      />
-                    )}
+              {filteredOptions.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <View style={styles.emptyIcon}>
+                    <Ionicons
+                      name="list-outline"
+                      size={48}
+                      color={colors.mutedForeground}
+                    />
                   </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </Animated.View>
-      )}
+                  <Text style={styles.emptyText}>No options available</Text>
+                </View>
+              ) : (
+                <ScrollView
+                  style={styles.scrollView}
+                  showsVerticalScrollIndicator={true}
+                  bounces={false}
+                  nestedScrollEnabled={true}
+                >
+                  {filteredOptions.map((option, index) => (
+                    <TouchableOpacity
+                      key={`${option.value}-${index}`}
+                      style={[
+                        styles.option,
+                        index === filteredOptions.length - 1 &&
+                          styles.optionLast,
+                        option.value === value && styles.optionSelected,
+                      ]}
+                      onPress={() => handleOptionSelect(option.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.optionText,
+                          option.value === value && styles.optionTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                      <View style={styles.checkIcon}>
+                        {option.value === value && (
+                          <Ionicons
+                            name="checkmark"
+                            size={20}
+                            color={colors.primary}
+                          />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </ThemedAccordion>
+        </View>
+      </Animated.View>
     </>
   );
 };

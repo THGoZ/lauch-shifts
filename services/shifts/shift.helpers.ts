@@ -1,6 +1,9 @@
+import { shiftStatus } from "@/constants/enums";
 import { Shift } from "@/db/schema";
 import { CustomError } from "@/domain/entities/error-entity";
 import { FieldError, ShiftWithPatient } from "@/interfaces/interface";
+import { TimelineProps } from "react-native-calendars";
+import { MarkedDates } from "react-native-calendars/src/types";
 
 const startTimeAM = 8;
 const endTimeAM = 12;
@@ -44,12 +47,16 @@ export const availableSlots = (shifts: ShiftWithPatient[], slotDuration: number 
   return available;
 };
 
-export const formatTime = (time: string) => {
+export const formatTime = (time: string, use24HourFormat = false) => {
   const [hours, minutes] = time.split(":");
   const hour = parseInt(hours);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  const displayHour = hour % 12 || 12;
-  return `${displayHour}:${minutes} ${ampm}`;
+  if (use24HourFormat) {
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  } else {
+    return `${hour}:${minutes}`;
+  }
 };
 
 export const formatDuration = (duration: number) => {
@@ -136,4 +143,92 @@ export function checkOverLappingAndThrowFields(existingShifts: Shift[], slotStar
       overlappingMessage
     );
   }
+}
+
+export function returnShiftsWithSections(shifts: ShiftWithPatient[], weeks: Date[]) {
+  const sections: string[] = weeks.map(week => week.toISOString().split("T")[0]);
+
+  /*   shifts.map(shift => {
+      const date = shift.date;
+  
+      if (!sections.includes(date)) {
+        sections.push(date);
+      }
+    }); */
+
+  const shiftsWithSections = sections.map(section => {
+    return {
+      title: section,
+      data: shifts.filter(shift => shift.date === section)
+    }
+  })
+  return shiftsWithSections;
+}
+
+export function getWeekRange(date: Date): Date[] {
+  const day = date.getDay(); 
+  const diffToMonday = day === 0 ? -6 : 1 - day; 
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diffToMonday);
+
+  const week = [];
+
+  for (let i = 0; i < 7; i++) {
+    const currentDay = new Date(monday);
+    currentDay.setDate(monday.getDate() + i);
+    week.push(currentDay);
+  }
+
+  return week;
+}
+
+export function getStatusColor(status: shiftStatus) {
+  switch (status) {
+    case "confirmed":
+      return "#10b981";
+    case "pending":
+      return "#f59e0b";
+    case "canceled":
+      return "#ef4444";
+    default:
+      return "#e6f7f7";
+  }
+}
+
+export function checkIfDateIsInRange(date: Date, week: Date[]) {
+  return !week.some(day => day.toISOString().split("T")[0] === date.toISOString().split("T")[0]);
+}
+
+export function mapShiftsToEvents(date: string, shifts: ShiftWithPatient[]) {
+  const datedEvents: {
+    [date: string]: TimelineProps['events'];
+  } = {};
+
+  const events = shifts.map(shift => {
+    const start = new Date(`${date}T${shift.start_time}`);
+    const end = new Date(start.getTime() + shift.duration * 60 * 1000);
+
+    return {
+      id: shift.id.toString(),
+      title: `${shift.patient?.name} ${shift.patient?.lastname}`,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      color: getStatusColor(shift.status as shiftStatus),
+    };
+  });
+
+
+  datedEvents[date] = events;
+
+  return datedEvents;
+}
+
+export function getMarkedDates(shifts: ShiftWithPatient[]) : MarkedDates {
+  const markedDates: MarkedDates = {};
+
+  shifts.forEach(shift => {
+    const date = shift.date;
+    markedDates[date] = {marked: true};
+  });
+  return markedDates;
 }

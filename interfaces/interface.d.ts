@@ -9,6 +9,18 @@ interface ShiftWithPatient {
   status: string;
   details: string | null;
   patient?: Patient
+  reason_incomplete?: string | null;
+  reprogramed?: boolean | null;
+}
+
+interface ShiftUpdate {
+  date?: string;
+  start_time?: string;
+  duration?: number;
+  status?: "pending" | "confirmed" | "canceled";
+  reason_incomplete?: string | null;
+  details?: string | null;
+  reprogramed?: boolean | null;
 }
 
 interface ResultItem<T> {
