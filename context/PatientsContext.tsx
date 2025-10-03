@@ -41,8 +41,8 @@ export const PatientsProvder: React.FC<{ children: React.ReactNode }> = ({
 
   const getPatients = async (
     search?: string,
-    page = 1,
-    limit = 10,
+    page?: number,
+    limit = 0,
     filters: Filter<typeof patient>[] = [],
     sort?: SortValue<typeof patient>
   ): Promise<ResultItem<PagedResult<Patient>>> => {

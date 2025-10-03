@@ -12,7 +12,7 @@ export class Patient {
 
     static async getAll(
         search = "",
-        page = 1,
+        page?: number,
         limit = 10,
         filters: Filter<typeof patient>[] = [],
         sort: SortValue<typeof patient> = { field: "name", order: "desc" }
@@ -27,7 +27,6 @@ export class Patient {
 
         const searchClause = buildSearchConditions(patient, search, ["name", "lastname"]);
         const filterClause = buildFilterConditions(patient, normalizedFilters);
-        console.log(filters);
         const whereClause = and(
             ...(searchClause ? [searchClause] : []),
             ...(filterClause ? [filterClause] : []),
@@ -35,27 +34,37 @@ export class Patient {
 
         const count = await countDbQuery(patient, whereClause);
 
-        const totalPages = paginationValues(page, limit, count);
-
-        if (totalPages < page && page !== 1) {
-            throw new Error("Page not found");
-        }
-
-        const response = await db
+        let query = db
             .select()
             .from(patient)
             .where(whereClause)
-            .limit(limit)
-            .offset((page - 1) * limit)
             .orderBy(sort.order === "asc" ? asc(patient[sort.field] as any) : desc(patient[sort.field] as any));
 
-        return {
-            data: response,
-            total: count,
-            page,
-            totalPages,
+        let data: PatientType[];
+        let totalPages: number;
+
+        if (!page || limit === 0) {
+            totalPages = 1;
+            data = await query;
+        } else {
+            totalPages = paginationValues(page, limit, count);
+
+            if (totalPages < page && page !== 1) {
+                throw new Error("Page not found");
+            }
+
+            data = await query.limit(limit).offset((page - 1) * limit);
         }
+
+        return {
+            data,
+            total: count,
+            page: page ?? 1,
+            totalPages,
+        };
     }
+
+
 
     static async getById(id: number): Promise<PatientType> {
         const response = await db.select().from(patient).where(eq(patient.id, id)).limit(1);

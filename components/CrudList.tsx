@@ -1,6 +1,7 @@
 import { SortValue } from "@/db/domain/utils/queryHandle";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { Ionicons } from "@expo/vector-icons";
+import { useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -80,7 +81,7 @@ export default function CrudList<T>({
   emptyState,
 }: CrudListProps<T>) {
   const colors = useThemeColors();
-  const styles = StyleSheet.create({
+  const styles = useMemo(() => StyleSheet.create({
     headerContainer: {
       paddingHorizontal: 20,
       paddingVertical: 16,
@@ -151,7 +152,7 @@ export default function CrudList<T>({
       fontWeight: "bold",
       color: colors.primaryForeground,
     },
-  });
+  }), [colors]);
   return (
     <FlatList
       data={items}

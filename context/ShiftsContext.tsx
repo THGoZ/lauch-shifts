@@ -1,3 +1,4 @@
+import { shiftStatus } from "@/constants/enums";
 import { Shifts as ShiftsDB } from "@/db/domain/shifts/shifts";
 import { CompareFilter, Filter } from "@/db/domain/utils/queryHandle";
 import { shift, Shift } from "@/db/schema";
@@ -33,6 +34,11 @@ interface ShiftsContextType {
   getPureShifts: () => Promise<Shift[]>;
   getPureShiftsOfDate: (date: string) => Promise<Shift[]>;
   getShiftById: (id: number) => Promise<ResultItem<ShiftWithPatient>>;
+  bulkUpdateShiftsStatus: (
+    ids: string[],
+    status: shiftStatus
+  ) => Promise<ResultItem<boolean>>;
+  bulkDeleteShifts: (ids: string[]) => Promise<ResultItem<boolean>>;
   countActiveShifts: () => Promise<void>;
   error: CustomError | null;
   isLoading: boolean;
@@ -197,7 +203,9 @@ export const ShiftsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const getShiftByDate = async (date: string): Promise<ResultItem<ShiftWithPatient[]>> => {
+  const getShiftByDate = async (
+    date: string
+  ): Promise<ResultItem<ShiftWithPatient[]>> => {
     setIsLoading(true);
     setError(null);
     try {
@@ -226,6 +234,53 @@ export const ShiftsProvider: React.FC<{ children: React.ReactNode }> = ({
         return returnResult(error.message, false, null, error);
       }
       return returnResult("Error al obtener el paciente", false, null, error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const bulkUpdateShiftsStatus = async (
+    ids: string[],
+    status: shiftStatus
+  ): Promise<ResultItem<boolean>> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await ShiftsDB.updateStatusBulk(ids, status);
+      return returnResult("Shifts updated successfully", true, result);
+    } catch (error) {
+      if (error instanceof Error) {
+        return returnResult(error.message, false, null, error);
+      }
+      return returnResult(
+        "There was an error updating the shifts",
+        false,
+        null,
+        error
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const bulkDeleteShifts = async (
+    ids: string[],
+  ): Promise<ResultItem<boolean>> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await ShiftsDB.deleteBulk(ids);
+      return returnResult("Shifts deleted successfully", true, result);
+    } catch (error) {
+      if (error instanceof Error) {
+        return returnResult(error.message, false, null, error);
+      }
+      return returnResult(
+        "There was an error deleting the shifts",
+        false,
+        null,
+        error
+      );
     } finally {
       setIsLoading(false);
     }
@@ -268,6 +323,8 @@ export const ShiftsProvider: React.FC<{ children: React.ReactNode }> = ({
         getPureShifts,
         getPureShiftsOfDate,
         getShiftById,
+        bulkUpdateShiftsStatus,
+        bulkDeleteShifts,
         activeShiftsCount,
         countActiveShifts,
         error,

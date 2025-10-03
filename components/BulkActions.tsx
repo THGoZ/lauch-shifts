@@ -6,7 +6,7 @@ import { useSharedValue } from "react-native-reanimated";
 import ThemedAccordion from "./ThemedAccordion";
 import ThemedButton, { ButtonVariant } from "./ThemedButton";
 
-type customAction = {
+export type customBulkAction = {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
@@ -17,7 +17,7 @@ interface BulkActionsProps {
   selectedCount: number;
   onBulkDelete: () => void;
   onClearSelection: () => void;
-  customActions?: customAction[];
+  customActions?: customBulkAction[];
 }
 
 export default function BulkActions({
@@ -54,7 +54,7 @@ export default function BulkActions({
       gap: 8,
       flexWrap: "wrap",
       alignContent: "center",
-      justifyContent: "flex-start",
+      justifyContent: "space-evenly",
       flex: 1,
       flexDirection: "row",
     },

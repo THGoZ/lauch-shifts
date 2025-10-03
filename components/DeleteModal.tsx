@@ -1,5 +1,5 @@
 import { useThemeColors } from "@/hooks/useThemeColors";
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import ThemedButton from "./ThemedButton";
 
 interface DeleteModalProps {
@@ -76,8 +76,8 @@ const DeleteModal = ({
         transparent={true}
         onRequestClose={onCancel}
       >
-        <View style={styles.centeredView}>
-          <View style={styles.modalView}>
+        <Pressable style={styles.centeredView} onPress={() => onCancel()}>
+          <Pressable style={styles.modalView} onPress={() => {}}>
             <Text style={styles.title}>{title}</Text>
             <View style={styles.subtitleContainer}>
               <Text style={styles.subtitle}>{description} </Text>
@@ -101,8 +101,8 @@ const DeleteModal = ({
                 disabled={isLoading}
               />
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
   );
 };

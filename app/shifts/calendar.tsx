@@ -1,6 +1,7 @@
 import AgendaItem from "@/components/AgendaItem";
 import ErrorDisplay from "@/components/ErrorDisplay";
 import ItemDetailsModal, { ModalActions } from "@/components/ItemsDetailModal";
+import ShiftEventDisplay from "@/components/ShiftEventDisplay";
 import ThemedBasicModal from "@/components/ThemedBasicModal";
 import ThemedButton from "@/components/ThemedButton";
 import ThemedCheckbox from "@/components/ThemedCheckbox";
@@ -26,6 +27,7 @@ import {
   mapShiftsToEvents,
   returnShiftsWithSections,
 } from "@/services/shifts/shift.helpers";
+import { getTransparentColor } from "@/utils/colorTools";
 import { Ionicons } from "@expo/vector-icons";
 import { joiResolver } from "@hookform/resolvers/joi";
 import { LinearGradient } from "expo-linear-gradient";
@@ -42,6 +44,7 @@ import {
   ActivityIndicator,
   Animated,
   RefreshControl,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -249,6 +252,24 @@ const ExpandableCalendarScreen = () => {
           flexWrap: "wrap",
           gap: 8,
         },
+        extraDetailsContainer: {
+          marginVertical: 5,
+          maxHeight: 200,
+          gap: 10,
+          flexDirection: "row",
+        },
+        shiftDeatilsContainer: {
+          flexGrow: 1,
+          padding: 10,
+          borderWidth: 1,
+          borderRadius: 12,
+          borderColor: colors.border,
+          backgroundColor: getTransparentColor(colors.secondaryMuted, 0.5),
+        },
+        extraDetailsText: {
+          fontSize: 14,
+          color: colors.secondaryForeground,
+        },
       }),
     [colors]
   );
@@ -271,13 +292,13 @@ const ExpandableCalendarScreen = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [shifts, setShifts] = useState<ShiftSection[]>([]);
   const [detailsItem, setDetailsItem] = useState<ShiftWithPatient | null>(null);
-  const [isDetailsModalVisible, setIsDetailsModalVisible] =
-    useState<boolean>(false);
-  const [isRescheduleModalVisible, setIsRescheduleModalVisible] =
-    useState<boolean>(false);
+  // const [isDetailsModalVisible, setIsDetailsModalVisible] =
+  //   useState<boolean>(false);
+  const isDetailsModalVisible = detailsItem ? true : false;
   const [rescheduleShiftId, setRescheduleShiftId] = useState<number | null>(
     null
   );
+  const isRescheduleModalVisible = rescheduleShiftId ? true : false;
   const [statusFilter, setStatusFilter] = useState<Status>(Status.All);
   const [inSelection, setInSelection] = useState<boolean>(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -294,8 +315,15 @@ const ExpandableCalendarScreen = () => {
 
   const timelineProps: Partial<TimelineProps> = {
     format24h: true,
-    // scrollToFirst: true,
     overlapEventsSpacing: 8,
+    onEventPress(event) {
+        if (event.id !== undefined) {
+          onDetailsPress(Number(event.id));
+        }
+    },
+    renderEvent: (event) => {
+      return <ShiftEventDisplay key={event.id} shift={event} />;
+    },
     rightEdgeSpacing: 24,
     timelineLeftInset: 92,
     theme: {
@@ -502,7 +530,7 @@ const ExpandableCalendarScreen = () => {
         status: shift.status,
         details: shift.details,
         patient: shift.patient,
-        onPress: () => onDetailsPress(shift),
+        onPress: () => onDetailsPress(shift.id),
       })),
     }));
     setItems(itemstoset);
@@ -534,20 +562,20 @@ const ExpandableCalendarScreen = () => {
   };
 
   const onDetailsPress = useCallback(
-    async (shift: ShiftWithPatient) => {
-       const response = await getShiftById(shift.id);
-      if (!response.success) {
-        showToast("error", "Error al obtener el turno", response.error.message);
-        return;
-      } 
-      const shiftWithPatient = response.result;
-      if(!shiftWithPatient) {
+    async (shiftId : number) => {
+      // const response = await getShiftById(shiftId);
+      // if (!response.success) {
+      //   showToast("error", "Error al obtener el turno", response.error.message);
+      //   return;
+      // }
+      // const shiftWithPatient = response.result;
+      const shiftWithPatient = allshifts.data.find(shift => shift.id === shiftId);
+      if (!shiftWithPatient) {
         showToast("error", "Error al obtener el turno", "Shift not found");
         return;
       }
       resetDetailsForm();
       setDetailsItem(shiftWithPatient);
-      setIsDetailsModalVisible(true);
       resetDetailsForm({
         status: shiftWithPatient.status,
         reason_incomplete: shiftWithPatient.reason_incomplete,
@@ -558,11 +586,10 @@ const ExpandableCalendarScreen = () => {
 
   const onDetailsClose = useCallback(async () => {
     setDetailsItem(null);
-    setIsDetailsModalVisible(false);
     setValue("status", null);
     setValue("reason_incomplete", null);
     clearErrors();
-  }, []);
+  }, [setDetailsItem]);
 
   const {
     control,
@@ -636,7 +663,7 @@ const ExpandableCalendarScreen = () => {
         detailsItem?.status !== shiftStatus.CANCELLED
       ) {
         setRescheduleShiftId(detailsItem?.id as number);
-        setIsRescheduleModalVisible(true);
+        // setIsRescheduleModalVisible(true);
       }
     } catch (error) {
       if (error instanceof Error) {
@@ -660,12 +687,14 @@ const ExpandableCalendarScreen = () => {
       );
       return;
     }
-    router.push(`/shifts/create-single?id=${rescheduleShiftId}&isReprogramming=true`);
+    router.push(
+      `/shifts/create-single?id=${rescheduleShiftId}&isReprogramming=true`
+    );
     onRescheduleClose();
   };
 
   const onRescheduleClose = () => {
-    setIsRescheduleModalVisible(false);
+    // setIsRescheduleModalVisible(false);
     setRescheduleShiftId(null);
   };
 
@@ -753,6 +782,17 @@ const ExpandableCalendarScreen = () => {
     );
   };
 
+  const renderExtraDetails = () => {
+    if (detailsItem?.details === null) return null;
+    return (
+      <View style={styles.extraDetailsContainer}>
+        <ScrollView style={styles.shiftDeatilsContainer}>
+          <Text style={styles.extraDetailsText}>{detailsItem?.details}</Text>
+        </ScrollView>
+      </View>
+    );
+  };
+
   const handleSelectToggle = useCallback((itemId: string | number) => {
     setInSelection((prev) => !prev);
     setSelectedItems((prev) =>
@@ -791,12 +831,6 @@ const ExpandableCalendarScreen = () => {
   const onDateChanged = useCallback(
     (date: string) => {
       setSelectedDate(date);
-      /*       setFilters([
-        {
-          field: "date",
-          value: date,
-        },
-      ]); */
     },
     [setSelectedDate]
   );
@@ -955,8 +989,10 @@ const ExpandableCalendarScreen = () => {
                 <View style={styles.statItem}>
                   <Text style={[styles.statNumber, { color: colors.success }]}>
                     {
-                      allshifts.data.filter((s) => s.status === "confirmed" && s.date === selectedDate)
-                        .length
+                      allshifts.data.filter(
+                        (s) =>
+                          s.status === "confirmed" && s.date === selectedDate
+                      ).length
                     }
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.success }]}>
@@ -967,8 +1003,9 @@ const ExpandableCalendarScreen = () => {
                 <View style={styles.statItem}>
                   <Text style={[styles.statNumber, { color: colors.warning }]}>
                     {
-                      allshifts.data.filter((s) => s.status === "pending" && s.date === selectedDate)
-                        .length
+                      allshifts.data.filter(
+                        (s) => s.status === "pending" && s.date === selectedDate
+                      ).length
                     }
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.warning }]}>
@@ -981,8 +1018,10 @@ const ExpandableCalendarScreen = () => {
                     style={[styles.statNumber, { color: colors.destructive }]}
                   >
                     {
-                      allshifts.data.filter((s) => s.status === "canceled" && s.date === selectedDate)
-                        .length
+                      allshifts.data.filter(
+                        (s) =>
+                          s.status === "canceled" && s.date === selectedDate
+                      ).length
                     }
                   </Text>
                   <Text
@@ -1003,6 +1042,28 @@ const ExpandableCalendarScreen = () => {
           <View style={styles.deleteModalContainer}>
             <ItemDetailsModal
               metadata={[
+                {
+                  label: "Patient",
+                  value: `${detailsItem.patient?.name} ${detailsItem.patient?.lastname}`,
+                  icon: (
+                    <Ionicons
+                      name="person-outline"
+                      size={16}
+                      color={colors.accent}
+                    />
+                  ),
+                },
+                {
+                  label: "DNI",
+                  value: detailsItem.patient?.dni,
+                  icon: (
+                    <Ionicons
+                      name="card-outline"
+                      size={16}
+                      color={colors.accent}
+                    />
+                  ),
+                },
                 {
                   label: "Date",
                   value: detailsItem.date,
@@ -1051,6 +1112,21 @@ const ExpandableCalendarScreen = () => {
                     />
                   ),
                 },
+                {
+                  label: "Reprogramed",
+                  value: detailsItem.reprogramed
+                    ? detailsItem.reprogramed === true
+                      ? "Yes"
+                      : "No"
+                    : "No",
+                  icon: (
+                    <Ionicons
+                      name="help-circle-outline"
+                      size={16}
+                      color={colors.accent}
+                    />
+                  ),
+                },
               ]}
               isOpen={isDetailsModalVisible}
               onClose={() => onDetailsClose()}
@@ -1062,7 +1138,10 @@ const ExpandableCalendarScreen = () => {
               onDelete={() => console.log("Borrar")}
               actions={actions}
             >
-              {renderEditStatusForm()}
+              <View>
+                {renderExtraDetails()}
+                {renderEditStatusForm()}
+              </View>
             </ItemDetailsModal>
           </View>
         )}
@@ -1070,7 +1149,7 @@ const ExpandableCalendarScreen = () => {
           {rescheduleShiftId && (
             <ThemedBasicModal
               isOpen={isRescheduleModalVisible}
-              onClose={() => setIsRescheduleModalVisible(false)}
+              onClose={() => setRescheduleShiftId(null)}
               title={`Reschedule shift N° ${rescheduleShiftId}`}
             >
               <View style={styles.rescheduleModalContent}>
@@ -1114,14 +1193,14 @@ const ExpandableCalendarScreen = () => {
       <AgendaList
         sections={items}
         renderItem={renderItem}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={onRefresh}
-          colors={[colors.primary]}
-          tintColor={colors.primary}
-        />
-      }
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
         renderSectionFooter={({ section }) => {
           if (section.data.length === 0) {
             return (
@@ -1233,9 +1312,7 @@ const ExpandableCalendarScreen = () => {
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    <View style={{ flex: 1 }}>
-      {renderPageContent()}
-    </View>
+      <View style={{ flex: 1 }}>{renderPageContent()}</View>
     </SafeAreaView>
   );
 };

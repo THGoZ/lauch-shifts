@@ -144,7 +144,7 @@ export const ThemedSortSelect: React.FC<SortSelectProps> = ({
           onRequestClose={() => setModalVisible(false)}
         >
           <Pressable
-            className="flex-1 justify-end my-2"
+            className="flex-1 align-bottom justify-end my-2"
             style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
             onPress={() => setModalVisible(false)}
           >

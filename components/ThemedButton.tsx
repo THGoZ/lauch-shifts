@@ -26,12 +26,17 @@ import Animated, {
 // Button variant types
 export type ButtonVariant =
   | "primary"
+  | "primaryOutline"
   | "secondary"
+  | "secondaryOutline"
   | "outline"
   | "ghost"
   | "destructive"
+  | "destructiveOutline"
   | "success"
-  | "warning";
+  | "successOutline"
+  | "warning"
+  | "warningOutline";
 
 // Button size types
 export type ButtonSize = "small" | "medium" | "large";
@@ -104,6 +109,15 @@ const ThemedButton = ({
           pressedTextColor: colors.primary,
           shadowColor: colors.primary,
         };
+      case "primaryOutline":
+        return {
+          backgroundColor: "transparent",
+          borderColor: colors.primary,
+          textColor: colors.primary,
+          pressedBackgroundColor: colors.primary + "20", // light overlay
+          pressedTextColor: colors.primary,
+          shadowColor: "transparent",
+        };
       case "secondary":
         return {
           backgroundColor: colors.secondary,
@@ -112,6 +126,69 @@ const ThemedButton = ({
           pressedBackgroundColor: colors.secondaryForeground,
           pressedTextColor: colors.secondary,
           shadowColor: colors.secondary,
+        };
+      case "secondaryOutline":
+        return {
+          backgroundColor: "transparent",
+          borderColor: colors.secondary,
+          textColor: colors.secondary,
+          pressedBackgroundColor: colors.secondary + "20",
+          pressedTextColor: colors.secondary,
+          shadowColor: "transparent",
+        };
+      case "destructive":
+        return {
+          backgroundColor: colors.destructive,
+          borderColor: colors.destructive,
+          textColor: colors.destructiveForeground,
+          pressedBackgroundColor: colors.destructiveForeground,
+          pressedTextColor: colors.destructive,
+          shadowColor: colors.destructive,
+        };
+      case "destructiveOutline":
+        return {
+          backgroundColor: "transparent",
+          borderColor: colors.destructive,
+          textColor: colors.destructive,
+          pressedBackgroundColor: colors.destructive + "20",
+          pressedTextColor: colors.destructive,
+          shadowColor: "transparent",
+        };
+      case "success":
+        return {
+          backgroundColor: colors.success,
+          borderColor: colors.success,
+          textColor: colors.successForeground,
+          pressedBackgroundColor: colors.successForeground,
+          pressedTextColor: colors.success,
+          shadowColor: colors.success,
+        };
+      case "successOutline":
+        return {
+          backgroundColor: "transparent",
+          borderColor: colors.success,
+          textColor: colors.success,
+          pressedBackgroundColor: colors.success + "20",
+          pressedTextColor: colors.success,
+          shadowColor: "transparent",
+        };
+      case "warning":
+        return {
+          backgroundColor: colors.warning,
+          borderColor: colors.warningAccent,
+          textColor: colors.warningForeground,
+          pressedBackgroundColor: colors.warningForeground,
+          pressedTextColor: colors.warning,
+          shadowColor: colors.warning,
+        };
+      case "warningOutline":
+        return {
+          backgroundColor: "transparent",
+          borderColor: colors.warning,
+          textColor: colors.warning,
+          pressedBackgroundColor: colors.warning + "20",
+          pressedTextColor: colors.warning,
+          shadowColor: "transparent",
         };
       case "outline":
         return {
@@ -131,33 +208,6 @@ const ThemedButton = ({
           pressedTextColor: colors.foreground,
           shadowColor: "transparent",
         };
-      case "destructive":
-        return {
-          backgroundColor: colors.destructive,
-          borderColor: colors.destructive,
-          textColor: colors.destructiveForeground,
-          pressedBackgroundColor: colors.destructiveForeground,
-          pressedTextColor: colors.destructive,
-          shadowColor: colors.destructive,
-        };
-      case "success":
-        return {
-          backgroundColor: colors.success,
-          borderColor: colors.success,
-          textColor: colors.successForeground,
-          pressedBackgroundColor: colors.successForeground,
-          pressedTextColor: colors.success,
-          shadowColor: colors.success,
-        };
-      case "warning":
-        return {
-          backgroundColor: colors.warning,
-          borderColor: colors.warningAccent,
-          textColor: colors.warningForeground,
-          pressedBackgroundColor: colors.warningForeground,
-          pressedTextColor: colors.warning,
-          shadowColor: colors.warning,
-        };
       default:
         return {
           backgroundColor: colors.primary,
@@ -165,6 +215,7 @@ const ThemedButton = ({
           textColor: colors.primaryForeground,
           pressedBackgroundColor: colors.primaryForeground,
           pressedTextColor: colors.primary,
+          shadowColor: colors.primary,
         };
     }
   };
@@ -217,16 +268,20 @@ const ThemedButton = ({
         return [colors.primary, colors.accent];
       case "secondary":
         return [colors.secondary, colors.secondaryAccent];
-      case "outline":
-        return [colors.border, colors.border];
-      case "ghost":
-        return [colors.background, colors.background];
       case "destructive":
         return [colors.destructive, colors.destructiveAccent];
       case "success":
         return [colors.success, colors.successAccent];
       case "warning":
         return [colors.warning, colors.warningAccent];
+      case "primaryOutline":
+      case "secondaryOutline":
+      case "destructiveOutline":
+      case "successOutline":
+      case "warningOutline":
+      case "outline":
+      case "ghost":
+        return [colors.background, colors.background];
       default:
         return [colors.primary, colors.accent];
     }

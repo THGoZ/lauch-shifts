@@ -211,6 +211,7 @@ export function mapShiftsToEvents(date: string, shifts: ShiftWithPatient[]) {
     return {
       id: shift.id.toString(),
       title: `${shift.patient?.name} ${shift.patient?.lastname}`,
+      summary: shift.details ?? "Psychopedagogical session",
       start: start.toISOString(),
       end: end.toISOString(),
       color: getStatusColor(shift.status as shiftStatus),
@@ -231,4 +232,15 @@ export function getMarkedDates(shifts: ShiftWithPatient[]) : MarkedDates {
     markedDates[date] = {marked: true};
   });
   return markedDates;
+}
+
+export function formatIsoToTime(isoString: string, useUTC: boolean = false): string {
+  const date = new Date(isoString);
+
+  const hours = useUTC ? date.getUTCHours() : date.getHours();
+  const minutes = useUTC ? date.getUTCMinutes() : date.getMinutes();
+
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}`;
 }

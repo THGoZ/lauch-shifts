@@ -3,7 +3,7 @@ import { db } from "@/db/db";
 import type { Shift } from "@/db/schema";
 import { patient, shift } from "@/db/schema";
 import { CustomError } from "@/domain/entities/error-entity";
-import { ShiftUpdate } from "@/interfaces/interface";
+import { FieldError, ShiftUpdate } from "@/interfaces/interface";
 import { checkOverLappingAndThrowFields, newOverlapping } from "@/services/shifts/shift.helpers";
 import { parseSQLiteErrorFields } from "@/utils/db-error-handlers";
 import { and, eq, ne } from "drizzle-orm";
@@ -215,30 +215,30 @@ export class Shifts {
 
     static async getById(id: number, include_patient = true) {
         const [found] = await db.select({
-                id: shift.id,
-                patient_id: shift.patient_id,
-                date: shift.date,
-                start_time: shift.start_time,
-                duration: shift.duration,
-                status: shift.status,
-                reason_incomplete: shift.reason_incomplete,
-                details: shift.details,
-                updated_at: shift.updated_at,
-                created_at: shift.created_at,
-                ...(include_patient
-                    ? {
-                        patient: {
-                            name: patient.name,
-                            lastname: patient.lastname,
-                            dni: patient.dni,
-                            id: patient.id,
-                            created_at: patient.created_at,
-                            updated_at: patient.updated_at,
-                            deleted_at: patient.deleted_at,
-                        }
+            id: shift.id,
+            patient_id: shift.patient_id,
+            date: shift.date,
+            start_time: shift.start_time,
+            duration: shift.duration,
+            status: shift.status,
+            reason_incomplete: shift.reason_incomplete,
+            details: shift.details,
+            updated_at: shift.updated_at,
+            created_at: shift.created_at,
+            ...(include_patient
+                ? {
+                    patient: {
+                        name: patient.name,
+                        lastname: patient.lastname,
+                        dni: patient.dni,
+                        id: patient.id,
+                        created_at: patient.created_at,
+                        updated_at: patient.updated_at,
+                        deleted_at: patient.deleted_at,
                     }
-                    : {}),
-            }).from(shift).where(eq(shift.id, id)).innerJoin(patient, eq(shift.patient_id, patient.id));
+                }
+                : {}),
+        }).from(shift).where(eq(shift.id, id)).innerJoin(patient, eq(shift.patient_id, patient.id));
         return found;
     }
 
@@ -248,7 +248,7 @@ export class Shifts {
             if (data.date || data.start_time || data.duration) {
                 if (existingShift.date !== data.date || existingShift.start_time !== data.start_time || existingShift.duration !== data.duration) {
                     const existingShifts = await this.getAllOfDate(data.date ?? existingShift.date);
-                    checkOverLappingAndThrowFields(existingShifts, data.start_time ?? existingShift.start_time, data.duration ?? existingShift.duration);
+                    checkOverLappingAndThrowFields(existingShifts.filter(shift => shift.id !== id), data.start_time ?? existingShift.start_time, data.duration ?? existingShift.duration);
                 }
             }
             const [updated] = await db
@@ -260,6 +260,7 @@ export class Shifts {
                     status: data.status ?? existingShift.status,
                     reason_incomplete: data.reason_incomplete ?? existingShift.reason_incomplete,
                     details: data.details ?? existingShift.details,
+                    reprogramed: data.reprogramed ?? false,
                     updated_at: new Date(),
                 })
                 .where(eq(shift.id, id))
@@ -274,6 +275,31 @@ export class Shifts {
         }
     }
 
+    static async updateStatusBulk(ids: string[], status: shiftStatus) {
+        const results = await Promise.allSettled(
+            ids.map(id =>
+                db.update(shift)
+                    .set({ status })
+                    .where(eq(shift.id, parseInt(id)))
+            )
+        );
+        const errors: FieldError[] = [];
+        for (const result of results) {
+            if (result.status === "rejected") {
+                const fields = parseSQLiteErrorFields(result.reason);
+                if (fields.length > 0) {
+                    errors.push(...fields);
+                } else {
+                    errors.push(result.reason?.message || "Unknown error");
+                }
+            }
+        }
+        if (errors.length > 0) {
+            throw new CustomError("Error al actualizar algunos turnos", errors);
+        }
+        return true;
+    }
+
     static async delete(id: number) {
         try {
             await db.delete(shift).where(eq(shift.id, id));
@@ -282,6 +308,30 @@ export class Shifts {
             const fields = parseSQLiteErrorFields(error);
             throw new CustomError("Error al eliminar turno", fields, error);
         }
+    }
+
+    static async deleteBulk(ids: string[]) {
+        const results = await Promise.allSettled(
+            ids.map(id =>
+                db.delete(shift)
+                    .where(eq(shift.id, parseInt(id)))
+            )
+        );
+        const errors: FieldError[] = [];
+        for (const result of results) {
+            if (result.status === "rejected") {
+                const fields = parseSQLiteErrorFields(result.reason);
+                if (fields.length > 0) {
+                    errors.push(...fields);
+                } else {
+                    errors.push(result.reason?.message || "Unknown error");
+                }
+            }
+        }
+        if (errors.length > 0) {
+            throw new CustomError("Error while deleting some shifts", errors);
+        }
+        return true;
     }
 
     static async getAllOfDate(date: string) {

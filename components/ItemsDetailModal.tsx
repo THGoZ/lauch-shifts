@@ -21,7 +21,7 @@ export interface ModalActions {
 
 interface ModalMetadata {
   label: string;
-  value: string;
+  value: string | React.ReactNode;
   icon?: React.ReactNode;
 }
 
@@ -138,7 +138,10 @@ export default function ItemDetailsModal({
       defaultActions.push({
         label: "Editar",
         icon: "pencil-outline",
-        onPress: () => {onEdit(); onClose()},
+        onPress: () => {
+          onEdit();
+          onClose();
+        },
         variant: "outline" as const,
         disabled: false,
       });
@@ -147,7 +150,10 @@ export default function ItemDetailsModal({
       defaultActions.push({
         label: "Borrar",
         icon: "trash-outline",
-        onPress: () => {onDelete(); onClose()},
+        onPress: () => {
+          onDelete();
+          onClose();
+        },
         variant: "destructive" as const,
         disabled: false,
       });
@@ -164,14 +170,11 @@ export default function ItemDetailsModal({
       animationType="fade"
       transparent={true}
     >
-      <Pressable
-        style={{ flex: 1}}
-        onPress={() => {
-          onClose();
-        }}
+      <View
+        style={{ flex: 1 }}
       >
-        <Pressable style={styles.centeredView}>
-          <View style={styles.modalView}>
+        <Pressable style={styles.centeredView} onPress={() => onClose()}>
+          <Pressable style={styles.modalView} onPress={() => {}}>
             <View style={styles.header}>
               <Text style={styles.title}>{title}</Text>
               <View style={styles.closeButton}>
@@ -196,7 +199,11 @@ export default function ItemDetailsModal({
                     <View key={index} style={styles.metadataItem}>
                       {item.icon && item.icon}
                       <Text style={styles.metadataLabel}>{item.label}:</Text>
-                      <Text style={styles.metadataValue}>{item.value}</Text>
+                      {typeof item.value === "string" ? (
+                        <Text style={styles.metadataValue}>{item.value}</Text>
+                      ) : (
+                        item.value
+                      )}
                     </View>
                   ))}
                 </View>
@@ -228,9 +235,9 @@ export default function ItemDetailsModal({
                 </>
               )}
             </View>
-          </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </View>
     </Modal>
   );
 }

@@ -503,7 +503,7 @@ export default function PatientsScreen() {
               {
                 label: "View schedule",
                 onPress: () => {
-                  router.push(`/patients/${detailsItem.id}/schedule`);
+                  router.push(`/shifts?id=${detailsItem.id}`);
                   setIsDeleteModalVisible(false);
                   setIsDetailsModalVisible(false);
                 },

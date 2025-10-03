@@ -313,11 +313,7 @@ export default function CreateSingleShift() {
 
   const params = useLocalSearchParams();
   const shiftId = params.id ? parseInt(params.id as string) : undefined;
-  const isReprogramming : boolean = params.isReprogramming ? true : false;
-
-  useEffect(() => {
-    console.log(params)
-  }, [params]);
+  const isReprogramming: boolean = params.isReprogramming ? true : false;
 
   const {
     control,
@@ -478,10 +474,10 @@ export default function CreateSingleShift() {
   // };
 
   const dateChanged = () => {
-    if(!originalData) return false;
-    if(!isReprogramming) return false;
+    if (!originalData) return false;
+    if (!isReprogramming) return false;
     return watch("date") === originalData.date;
-  }
+  };
 
   const onSubmit = async (data: {
     patient_id: number;
@@ -492,20 +488,21 @@ export default function CreateSingleShift() {
   }) => {
     let success: ResultItem<Shift>;
 
-
-    if(isReprogramming){
-      data.details = data.details + `\n\nReprogramed from:\n${originalData.date} to ${data.date}`;
+    if (isReprogramming) {
+      data.details =
+        data.details +
+        `\n\nReprogramed from:\n${originalData.date} to ${data.date}`;
     }
 
     if (isEditing && shiftId) {
       success = await updateShift(shiftId, {
-        //TODO: Add reprogramed status
         patient_id: data.patient_id,
         date: data.date,
         start_time: data.start_time,
         duration: data.duration,
         status: "pending",
         details: data.details,
+        reprogramed : isReprogramming ? true : false,
       });
     } else {
       success = await addShift({
@@ -877,9 +874,14 @@ export default function CreateSingleShift() {
                     leftIcon="checkmark"
                     size="large"
                     variant="primary"
-                    title="Create Shift"
+                    title={`${isEditing ?
+                       isReprogramming ?
+                        "Reprogram" : "Update"
+                       : "Create"} shift`}
                     loading={isLoading}
-                    disabled={isLoading || (isEditing && !isDirty) || dateChanged()}
+                    disabled={
+                      isLoading || (isEditing && !isDirty) || dateChanged()
+                    }
                     onPress={handleSubmit((data) => onSubmit(data as any))}
                   />
 

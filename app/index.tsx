@@ -4,7 +4,6 @@ import { useThemeColors } from "@/hooks/useThemeColors";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useSQLiteContext } from "expo-sqlite";
 import React from "react";
 import {
   ActivityIndicator,
@@ -18,17 +17,14 @@ import {
 } from "react-native";
 
 const { width } = Dimensions.get("window");
-
 export default function IndexScreen() {
   const colors = useThemeColors();
 
   const { activeShiftsCount, isLoading: shiftsLoading } = useShifts();
   const { patientsCount, isLoading: patientsLoading } = usePatients();
 
-  const db = useSQLiteContext();
-
   const handleCreateShift = () => {
-    router.push("/shifts/calendar");
+    router.push("/shifts");
   };
 
   const handleCreatePatient = () => {

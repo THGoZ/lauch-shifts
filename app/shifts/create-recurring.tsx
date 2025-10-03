@@ -2,6 +2,7 @@ import AnimatedView from "@/components/AnimatedView";
 import ErrorDetails from "@/components/ErrorDetails";
 import { usePatients } from "@/context/PatientsContext";
 import { useShifts } from "@/context/ShiftsContext";
+import { useToast } from "@/context/ToastContext";
 import { Shift } from "@/db/schema";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { getOverlappingShifts } from "@/services/shifts/shift.helpers";
@@ -27,13 +28,6 @@ import {
 import { Calendar, DateData } from "react-native-calendars";
 import { ProgressStep, ProgressSteps } from "react-native-progress-steps";
 
-interface Patient {
-  id: number;
-  name: string;
-  lastname: string;
-  dni: string;
-}
-
 interface DaySchedule {
   dayId: number;
   start_time: Date;
@@ -47,13 +41,6 @@ interface RecurringShiftForm {
   daySchedules: DaySchedule[];
   status: "pending" | "confirmed" | "canceled";
 }
-
-// Mock patients data
-const mockPatients: Patient[] = [
-  { id: 1, name: "John", lastname: "Doe", dni: "12345678A" },
-  { id: 2, name: "Jane", lastname: "Smith", dni: "87654321B" },
-  { id: 3, name: "Maria", lastname: "Garcia", dni: "11223344C" },
-];
 
 const daysOfWeek = [
   { id: 1, name: "Monday", short: "Mon" },
@@ -81,7 +68,6 @@ export default function CreateRecurringShiftScreen() {
     getPureShiftsOfDate,
     isLoading: shiftsLoading,
     addShiftBulk,
-    error: shiftsError,
   } = useShifts();
   const [form, setForm] = useState<RecurringShiftForm>({
     patient_id: null,
@@ -94,6 +80,7 @@ export default function CreateRecurringShiftScreen() {
   const [activeTimePicker, setActiveTimePicker] = useState<number | null>(null);
   const [validationErrors, setValidationErrors] = useState<any[]>([]);
   const [validSchedules, setValidSchedules] = useState<boolean>(false);
+  const {showToast} = useToast();
 
   const colors = useThemeColors();
 
@@ -400,7 +387,10 @@ export default function CreateRecurringShiftScreen() {
 
   useEffect(() => {
     const fetchPatients = async () => {
-      await getPatients();
+      const response = await getPatients();
+      if(!response.success){
+        showToast("error", "Error while fetching patients", response.error);
+      }
     };
     fetchPatients();
   }, []);
@@ -553,10 +543,6 @@ export default function CreateRecurringShiftScreen() {
     setValidationErrors((prev) => [...prev, ...conflicts]);
   };
 
-  const clearConflicts = () => {
-    setValidationErrors([]);
-  };
-
   const generateShiftDates = () => {
     const shifts: Shift[] = [];
     const startDate = new Date(form.startDate);
@@ -637,7 +623,7 @@ export default function CreateRecurringShiftScreen() {
   };
 
   const getSelectedPatient = () => {
-    return patients.find((p) => p.id === form.patient_id);
+    return patients.data.find((p) => p.id === form.patient_id);
   };
 
   const isDaySelected = (dayId: number) => {
@@ -719,7 +705,7 @@ export default function CreateRecurringShiftScreen() {
                   <ActivityIndicator size="large" color={colors.primary} />
                 ) : (
                   <AnimatedView style={styles.patientsList}>
-                    {patients.map((patient) => (
+                    {patients.data.map((patient) => (
                       <TouchableOpacity
                         key={patient.id}
                         style={[
